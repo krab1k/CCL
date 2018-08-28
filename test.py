@@ -7,6 +7,7 @@ import antlr.CCLParser
 from ccl_parser import Parser, CCLErrorListener
 from ccl_symboltable import SymbolTable
 from ccl_errors import CCLError
+from generators.graphviz import Generator
 
 if len(sys.argv) != 2:
     print('Not enough arguments')
@@ -35,3 +36,8 @@ except CCLError as e:
 
 print('\nGlobal symbol table:')
 s.print()
+
+print('\nGraphviz source:')
+g = Generator()
+s = g.output(ast)
+print(s)

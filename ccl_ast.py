@@ -16,7 +16,7 @@ class ASTNode:
         self._column = pos[1]
 
     def __dir__(self):
-        return tuple(k for k in vars(self).keys() if not k.startswith('_'))
+        return list(k for k in self.__dict__.keys() if not k.startswith('_'))
 
     def __repr__(self):
         attr_value = []
@@ -31,7 +31,7 @@ class ASTNode:
         return f'{self.__class__.__qualname__}({string})'
 
     def __iter__(self):
-        for attr in dir(self):
+        for attr in self.__dir__():
             yield attr, getattr(self, attr)
 
 
