@@ -6,7 +6,7 @@ assign: lhs=var '=' rhs=expr;
 for_loop: 'for' identifier=NAME '=' value_from=NUMBER 'to' value_to=NUMBER ':' body+=statement+ 'done';
 for_each: 'for each' abtype=('atom' | 'bond') identifier=NAME ('such that' constraint)? ':' body+=statement+ 'done';
 
-expr: <assoc=right> left=expr op='^' right=expr    #BinOp
+expr: <assoc=right> left=expr op='^' right=expr #BinOp
     | op=('+' | '-') expr                       #UnaryOp
     | left=expr op=('*' | '/') right=expr       #BinOp
     | left=expr op=('+' | '-') right=expr       #BinOp
@@ -20,10 +20,10 @@ var: basename | subscript;
 basename: name=NAME;
 subscript: name=NAME '[' indices+=NAME (',' indices+=NAME)? ']';
 
-annotation: var '=' expr ('if' constraint)?                                 #ExprAnnotation
-          | name=NAME 'is' ptype=('atom' | 'bond' | 'common') 'parameter'   #ParameterAnnotation
-          | name=NAME 'is' abtype=('atom' | 'bond') 'such that' constraint  #ABAnnotation
-          | name=NAME 'is property' prop=NAME                               #PropertyAnnotation
+annotation: var '=' expr ('if' constraint)?                                     #ExprAnnotation
+          | name=NAME 'is' ptype=('atom' | 'bond' | 'common') 'parameter'       #ParameterAnnotation
+          | name=NAME 'is' abtype=('atom' | 'bond') ('such that' constraint)?   #ABAnnotation
+          | name=NAME 'is property' prop=NAME                                   #PropertyAnnotation
           ;
 constraint: left=constraint op=('and' | 'or') right=constraint                #AndOrConstraint
            | 'not' constraint                                                 #NotConstraint
@@ -46,3 +46,5 @@ WS: [ \t\n] -> channel(HIDDEN);
 
 NUMBER: '-'? DIGIT+ ('.' DIGIT+)?;
 NAME: LETTER+;
+
+ERROR_CHAR: .;

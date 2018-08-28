@@ -38,6 +38,7 @@ COMMENT=37
 WS=38
 NUMBER=39
 NAME=40
+ERROR_CHAR=41
 'where'=1
 '='=2
 'for'=3

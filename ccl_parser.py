@@ -1,18 +1,31 @@
 import antlr4
+from antlr4.error.ErrorListener import ErrorListener
 from antlr4.Token import CommonToken
 from antlr.CCLVisitor import CCLVisitor
 from antlr.CCLParser import CCLParser
 
 from ccl_ast import *
-from ccl_symboltable import SymbolTable
+
+
+# noinspection PyPep8Naming
+class CCLErrorListener(ErrorListener):
+    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+        all_lines = recognizer._input.tokenSource._input.strdata.split('\n')
+        low = line - 3 if line > 3 else 0
+        high = line + 3
+        bad_lines_raw = all_lines[low: high]
+        bad_lines = []
+        for bad_line, i in zip(bad_lines_raw, range(high - low + 1)):
+            bad_line_new = f'{low + i + 1:3d}: ' + bad_line
+            bad_lines.append(bad_line_new)
+        bad_lines_str = '\n'.join(bad_lines)
+        raise SyntaxError(f'Syntax error near line {line}:\n{bad_lines_str}\nReason: {msg}')
 
 
 class Parser(CCLVisitor):
     def __init__(self):
         super().__init__()
-        self.annotations = []
-        self.statements = []
-        self.symtable = SymbolTable()
+        self._name_handling = VarContext.STORE
 
     @staticmethod
     def get_pos(ctx):
@@ -24,33 +37,39 @@ class Parser(CCLVisitor):
             raise RuntimeError(f'Unknown context {ctx}')
 
     def visitMethod(self, ctx: CCLParser.MethodContext):
+        annotations = []
         for annotation in ctx.annotations:
-            self.annotations.append(self.visit(annotation))
+            annotations.append(self.visit(annotation))
 
+        statements = []
         for statement in ctx.body:
-            self.statements.append(self.visitStatement(statement))
-        pass
+            statements.append(self.visitStatement(statement))
+
+        return Method(self.get_pos(ctx), statements, annotations)
 
     def visitParameterAnnotation(self, ctx: CCLParser.ParameterAnnotationContext):
-        name = Name(self.get_pos(ctx.name), ctx.name.text)
+        name = Name(self.get_pos(ctx.name), ctx.name.text, VarContext.ANNOTATION)
         ptype = ctx.ptype.text.capitalize()
         return ParameterAnnotation(self.get_pos(ctx), name, ptype)
 
     def visitABAnnotation(self, ctx: CCLParser.ABAnnotationContext):
-        name = Name(self.get_pos(ctx.name), ctx.name.text)
-        abtype = ctx.abtype.text.capitalize()
-        constraint = self.visit(ctx.constraint())
-        return ObjectAnnotation(self.get_pos(ctx), name, abtype, constraint)
+        name = Name(self.get_pos(ctx.name), ctx.name.text, VarContext.ANNOTATION)
+        object_type = ctx.abtype.text.capitalize()
+        if ctx.constraint():
+            constraint = self.visit(ctx.constraint())
+        else:
+            constraint = None
+        return ObjectAnnotation(self.get_pos(ctx), name, object_type, constraint)
 
     def visitAndOrConstraint(self, ctx: CCLParser.AndOrConstraintContext):
         lhs = self.visit(ctx.left)
         rhs = self.visit(ctx.right)
-        op = AndOrConstraint.OPS[ctx.op.text]
-        return AndOrConstraint(self.get_pos(ctx), lhs, op, rhs)
+        op = BinaryLogicalOp.Ops(ctx.op.text.capitalize())
+        return BinaryLogicalOp(self.get_pos(ctx), lhs, op, rhs)
 
     def visitNotConstraint(self, ctx: CCLParser.NotConstraintContext):
         constraint = self.visit(ctx.constraint())
-        return UnaryConstraint(self.get_pos(ctx), UnaryConstraint.OPS['not'], constraint)
+        return UnaryLogicalOp(self.get_pos(ctx), UnaryLogicalOp.Ops.NOT, constraint)
 
     def visitParenConstraint(self, ctx: CCLParser.ParenConstraintContext):
         return self.visit(ctx.constraint())
@@ -58,13 +77,13 @@ class Parser(CCLVisitor):
     def visitCompareConstraint(self, ctx: CCLParser.CompareConstraintContext):
         lhs = self.visit(ctx.left)
         rhs = self.visit(ctx.right)
-        op = CompareConstraint.OPS[ctx.op.text]
-        return CompareConstraint(self.get_pos(ctx), lhs, op, rhs)
+        op = RelOp.Ops(ctx.op.text)
+        return RelOp(self.get_pos(ctx), lhs, op, rhs)
 
     def visitPredicateConstraint(self, ctx: CCLParser.PredicateConstraintContext):
         name = ctx.pred.text
         args = [self.visit(arg) for arg in ctx.args]
-        return PredicateConstraint(self.get_pos(ctx), name, args)
+        return Predicate(self.get_pos(ctx), name, args)
 
     def visitString(self, ctx: CCLParser.StringContext):
         return String(self.get_pos(ctx), ctx.getText().strip('"'))
@@ -80,13 +99,15 @@ class Parser(CCLVisitor):
 
     def visitAssign(self, ctx: CCLParser.AssignContext):
         var = self.visit(ctx.lhs)
+        self._name_handling = VarContext.LOAD
         expr = self.visit(ctx.rhs)
+        self._name_handling = VarContext.STORE
         return Assign(self.get_pos(ctx), var, expr)
 
     def visitBinOp(self, ctx: CCLParser.BinOpContext):
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
-        op = BinaryOp.OPS[ctx.op.text]
+        op = BinaryOp.Ops(ctx.op.text)
         return BinaryOp(self.get_pos(ctx), left, op, right)
 
     def visitParenOp(self, ctx: CCLParser.ParenOpContext):
@@ -100,17 +121,17 @@ class Parser(CCLVisitor):
         return Number(self.get_pos(ctx), n)
 
     def visitBasename(self, ctx: CCLParser.BasenameContext):
-        return Name(self.get_pos(ctx), ctx.name.text)
+        return Name(self.get_pos(ctx), ctx.name.text, self._name_handling)
 
     def visitSubscript(self, ctx: CCLParser.SubscriptContext):
-        name = ctx.name.text
+        name = Name(self.get_pos(ctx.name), ctx.name.text, self._name_handling)
         indices = []
         for idx in ctx.indices:
-            indices.append(Name(self.get_pos(idx), idx.text))
-        return Subscript(self.get_pos(ctx), name, indices)
+            indices.append(Name(self.get_pos(idx), idx.text, VarContext.LOAD))
+        return Subscript(self.get_pos(ctx), name, indices, self._name_handling)
 
     def visitSumOp(self, ctx: CCLParser.SumOpContext):
-        name = ctx.identifier.text
+        name = Name(self.get_pos(ctx.identifier), ctx.identifier.text, VarContext.LOAD)
         expr = self.visit(ctx.expr())
         return Sum(self.get_pos(ctx), name, expr)
 
@@ -119,10 +140,10 @@ class Parser(CCLVisitor):
         if ctx.op.text == '+':
             return expr
         else:
-            return UnaryOp(self.get_pos(ctx), UnaryOp.OPS['-'], expr)
+            return UnaryOp(self.get_pos(ctx), UnaryOp.Ops.NEG, expr)
 
     def visitFor_loop(self, ctx: CCLParser.For_loopContext):
-        name = Name(self.get_pos(ctx.identifier), ctx.identifier.text)
+        name = Name(self.get_pos(ctx.identifier), ctx.identifier.text, VarContext.STORE)
         value_from = Number(self.get_pos(ctx.value_from), int(ctx.value_from.text))
         value_to = Number(self.get_pos(ctx.value_to), int(ctx.value_to.text))
         body = []
@@ -131,8 +152,8 @@ class Parser(CCLVisitor):
         return For(self.get_pos(ctx), name, value_from, value_to, body)
 
     def visitFor_each(self, ctx: CCLParser.For_eachContext):
-        name = Name(self.get_pos(ctx.identifier), ctx.identifier.text)
-        abtype = ctx.abtype.text.capitalize()
+        name = Name(self.get_pos(ctx.identifier), ctx.identifier.text, VarContext.STORE)
+        object_type = ctx.abtype.text.capitalize()
         if ctx.constraint() is not None:
             constraint = self.visit(ctx.constraint())
         else:
@@ -141,7 +162,7 @@ class Parser(CCLVisitor):
         for statement in ctx.body:
             body.append(self.visit(statement))
 
-        return ForEach(self.get_pos(ctx), name, abtype, constraint, body)
+        return ForEach(self.get_pos(ctx), name, object_type, constraint, body)
 
 
 

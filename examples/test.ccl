@@ -1,0 +1,20 @@
+# PEOE
+for alpha = 0 to 6:
+    for each atom i:
+        chi[i] = C[i] * q[i] ^ 2 + B[i] * q[i] + A[i]
+    done
+
+    for each atom i:
+        q[i] = q[i] + (sum[j]((chi[j] - chi[i]) / d[i]) + sum[k]((chi[k] - chi[i]) / d[k])) * ((1 / 2) ^ alpha)
+    done
+done
+
+where
+
+A is atom parameter
+B is atom parameter
+C is atom parameter
+j is atom such that bonded(i, j) and chi[j] > chi[i]
+k is atom such that bonded(i, k) and chi[k] < chi[i]
+d[i] = 20.02 if element(i, "hydrogen")
+d[i] = A[i] + B[i] + C[i]
