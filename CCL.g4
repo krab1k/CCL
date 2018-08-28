@@ -3,7 +3,7 @@ grammar CCL;
 method: body+=statement+ ('where' annotations+=annotation+)? EOF;
 statement: assign | for_loop | for_each;
 assign: lhs=var '=' rhs=expr;
-for_loop: 'for' identifier=NAME '=' value_from=NUMBER 'to' value_to=NUMBER ':' body+=statement+ 'done';
+for_loop: 'for' identifier=NAME '=' value_from=number 'to' value_to=number ':' body+=statement+ 'done';
 for_each: 'for each' abtype=('atom' | 'bond') identifier=NAME ('such that' constraint)? ':' body+=statement+ 'done';
 
 expr: <assoc=right> left=expr op='^' right=expr #BinOp

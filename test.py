@@ -5,8 +5,8 @@ import antlr.CCLLexer
 import antlr.CCLParser
 
 from ccl_parser import Parser, CCLErrorListener
-from ccl_symboltable import SymbolTable, CCLSymbolError, CCLTypeError
-
+from ccl_symboltable import SymbolTable
+from ccl_errors import CCLError
 
 if len(sys.argv) != 2:
     print('Not enough arguments')
@@ -19,21 +19,18 @@ lexer = antlr.CCLLexer.CCLLexer(antlr4.InputStream(data))
 token_stream = antlr4.CommonTokenStream(lexer)
 parser = antlr.CCLParser.CCLParser(token_stream)
 parser._listeners = [CCLErrorListener()]
+
 try:
     tree = parser.method()
-except SyntaxError as e:
-    print(e)
-    sys.exit(1)
-
-ccl_parser = Parser()
-ast = ccl_parser.visit(tree)
-print('AST:')
-ast.print_ast()
-
-try:
+    ccl_parser = Parser()
+    ast = ccl_parser.visit(tree)
+    print('AST:')
+    ast.print_ast()
     s = SymbolTable.create_from_ast(ast)
-except (CCLTypeError, CCLSymbolError) as e:
-    print('\n' + str(e))
+except CCLError as e:
+    print('\nERROR: ' + str(e.message))
+    print(f'\n{e.line:2d}:', data.split('\n')[e.line - 1])
+    print(' ' * (3 + e.column), '^')
     sys.exit(1)
 
 print('\nGlobal symbol table:')

@@ -5,21 +5,14 @@ from antlr.CCLVisitor import CCLVisitor
 from antlr.CCLParser import CCLParser
 
 from ccl_ast import *
+from ccl_errors import CCLSyntaxError
 
 
 # noinspection PyPep8Naming
 class CCLErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        all_lines = recognizer._input.tokenSource._input.strdata.split('\n')
-        low = line - 3 if line > 3 else 0
-        high = line + 3
-        bad_lines_raw = all_lines[low: high]
-        bad_lines = []
-        for bad_line, i in zip(bad_lines_raw, range(high - low + 1)):
-            bad_line_new = f'{low + i + 1:3d}: ' + bad_line
-            bad_lines.append(bad_line_new)
-        bad_lines_str = '\n'.join(bad_lines)
-        raise SyntaxError(f'Syntax error near line {line}:\n{bad_lines_str}\nReason: {msg}')
+        node = ASTNode((line, column))
+        raise CCLSyntaxError(node, msg)
 
 
 class Parser(CCLVisitor):
@@ -108,7 +101,7 @@ class Parser(CCLVisitor):
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
         op = BinaryOp.Ops(ctx.op.text)
-        return BinaryOp(self.get_pos(ctx), left, op, right)
+        return BinaryOp(self.get_pos(ctx.op), left, op, right)
 
     def visitParenOp(self, ctx: CCLParser.ParenOpContext):
         return self.visit(ctx.expr())
@@ -144,8 +137,8 @@ class Parser(CCLVisitor):
 
     def visitFor_loop(self, ctx: CCLParser.For_loopContext):
         name = Name(self.get_pos(ctx.identifier), ctx.identifier.text, VarContext.STORE)
-        value_from = Number(self.get_pos(ctx.value_from), int(ctx.value_from.text))
-        value_to = Number(self.get_pos(ctx.value_to), int(ctx.value_to.text))
+        value_from = self.visit(ctx.value_from)
+        value_to = self.visit(ctx.value_to)
         body = []
         for statement in ctx.body:
             body.append(self.visit(statement))

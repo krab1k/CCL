@@ -12,8 +12,8 @@ class ASTNode:
     _fields = ()
 
     def __init__(self, pos):
-        self._lineno = pos[0]
-        self._colno = pos[1]
+        self._line = pos[0]
+        self._column = pos[1]
 
     def __dir__(self):
         return tuple(k for k in vars(self).keys() if not k.startswith('_'))
