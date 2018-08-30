@@ -144,6 +144,13 @@ class SymbolTable:
         table.check_expr_annotations()
         return table
 
+    @classmethod
+    def get_table(cls, node: ASTNode):
+        if hasattr(node, 'symbol_table'):
+            return node.symbol_table
+        else:
+            return cls.get_table(node.parent)
+
     def print(self):
         for symbol in self.symbols.values():
             print(symbol)
@@ -169,6 +176,7 @@ class SymbolTableBuilder(ASTVisitor):
         self.current_table.define(VariableSymbol('q', None, NumericType.FLOAT, (ObjectType.ATOM,)))
 
     def visit_Method(self, node: Method):
+        node.symbol_table = self.symbol_table
         for a in node.annotations:
             self.visit(a)
 
@@ -189,6 +197,7 @@ class SymbolTableBuilder(ASTVisitor):
         if node.value_to.result_type != NumericType.INT:
             raise CCLTypeError(node.value_to, f'For loop upper bound not Int')
         self.current_table = SymbolTable(self.current_table)
+        node.symbol_table = self.current_table
         self.current_table.define(VariableSymbol(node.name.name, node, NumericType.INT, ()))
         for statement in node.body:
             self.visit(statement)
@@ -198,6 +207,7 @@ class SymbolTableBuilder(ASTVisitor):
     def visit_ForEach(self, node: ForEach):
         name = node.name.name
         self.current_table = SymbolTable(self.current_table)
+        node.symbol_table = self.current_table
         self.current_table.define(ObjectSymbol(name, node, ObjectType(node.kind), node.constraints))
         self.iterating_over.add(node.name.name)
 
@@ -232,7 +242,9 @@ class SymbolTableBuilder(ASTVisitor):
                         self.inside_constraint = False
                 node.result_type = symbol.symbol_type
             elif isinstance(symbol, ExprSymbol):
-                self.visit(list(symbol.rules.values())[0])
+                expr = list(symbol.rules.values())[0]
+                self.visit(expr)
+                node.result_type = expr.result_type
             else:
                 node.result_type = symbol.symbol_type
         if node.ctx == VarContext.LOAD and symbol is None:

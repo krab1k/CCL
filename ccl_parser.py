@@ -38,7 +38,9 @@ class Parser(CCLVisitor):
         for statement in ctx.body:
             statements.append(self.visitStatement(statement))
 
-        return Method(self.get_pos(ctx), statements, annotations)
+        method = Method(self.get_pos(ctx), statements, annotations)
+        ParentSetter().visit(method)
+        return method
 
     def visitParameterAnnotation(self, ctx: CCLParser.ParameterAnnotationContext):
         name = Name(self.get_pos(ctx.name), ctx.name.text, VarContext.ANNOTATION)

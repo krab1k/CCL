@@ -16,9 +16,10 @@ class ObjectType(Enum):
 class ASTNode:
     _fields = ()
 
-    def __init__(self, pos):
-        self._line = pos[0]
-        self._column = pos[1]
+    def __init__(self, pos: Tuple[int, int]):
+        self._line: int = pos[0]
+        self._column: int = pos[1]
+        self._parent: Optional['ASTNode'] = None
 
     def __dir__(self):
         return list(k for k in self.__dict__.keys() if not k.startswith('_'))
@@ -39,6 +40,10 @@ class ASTNode:
         for attr in self.__dir__():
             yield attr, getattr(self, attr)
 
+    @property
+    def parent(self):
+        return self._parent
+
 
 class ASTVisitor:
     def visit(self, node: ASTNode):
@@ -51,9 +56,41 @@ class ASTVisitor:
             if isinstance(value, list):
                 for item in value:
                     if isinstance(item, ASTNode):
+
                         self.visit(item)
             elif isinstance(value, ASTNode):
+                value._parent = node
                 self.visit(value)
+
+
+class ParentSetter:
+    def visit(self, node: ASTNode):
+        for field, value in node:
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, ASTNode):
+                        item._parent = node
+                        self.visit(item)
+            elif isinstance(value, ASTNode):
+                value._parent = node
+                self.visit(value)
+
+
+class NameGetter:
+    @classmethod
+    def visit(cls, node: ASTNode):
+        names = set()
+        if isinstance(node, Name):
+            names.add(node.name)
+        for field, value in node:
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, ASTNode):
+                        names = names | cls.visit(item)
+            elif isinstance(value, ASTNode):
+                names = names | cls.visit(value)
+
+        return names
 
 
 class Statement(ASTNode):
@@ -186,6 +223,7 @@ class Method(ASTNode):
         super().__init__(pos)
         self.statements: List[Statement] = statements
         self.annotations: List[Annotation] = annotations
+        self.symbol_table = None
 
     def print_ast(self):
         for s in self.statements:
@@ -241,6 +279,7 @@ class For(Statement):
         self.value_from: Number = value_from
         self.value_to: Number = value_to
         self.body: List[Statement] = body
+        self.symbol_table = None
 
 
 class ForEach(Statement):
@@ -251,6 +290,7 @@ class ForEach(Statement):
         self.kind: ObjectType = kind
         self.constraints: Constraint = constraints
         self.body: List[Statement] = body
+        self.symbol_table = None
 
 
 def is_atom(node: ASTNode):

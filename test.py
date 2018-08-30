@@ -6,7 +6,7 @@ import antlr.CCLParser
 from ccl_parser import Parser, CCLErrorListener
 from ccl_symboltable import SymbolTable
 from ccl_errors import CCLError
-from generators.latex import Generator
+from generators.python import Generator
 
 if len(sys.argv) != 2:
     print('Not enough arguments')
@@ -24,8 +24,6 @@ try:
     tree = parser.method()
     ccl_parser = Parser()
     ast = ccl_parser.visit(tree)
-    print('AST:')
-    ast.print_ast()
     table = SymbolTable.create_from_ast(ast)
 except CCLError as e:
     print('\nERROR: ' + str(e.message))
@@ -33,9 +31,12 @@ except CCLError as e:
     print(' ' * (3 + e.column), '^')
     sys.exit(1)
 
-print('\nGlobal symbol table:')
-table.print()
+print('\n*** CCL ****\n')
+print(data)
 
-print('\nLaTeX source:')
+print('\n*** Python ***\n')
 g = Generator(table)
-print(g.visit(ast))
+code = g.visit(ast)
+
+print(code)
+
