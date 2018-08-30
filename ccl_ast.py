@@ -8,6 +8,11 @@ class VarContext(Enum):
     ANNOTATION = 'Annotation'
 
 
+class ObjectType(Enum):
+    ATOM = 'Atom'
+    BOND = 'Bond'
+
+
 class ASTNode:
     _fields = ()
 
@@ -239,9 +244,21 @@ class For(Statement):
 
 
 class ForEach(Statement):
-    def __init__(self, pos: Tuple[int, int], name: Name, kind: str, constraints: Constraint, body: List[Statement]):
+    def __init__(self, pos: Tuple[int, int], name: Name, kind: ObjectType, constraints: Constraint,
+                 body: List[Statement]):
         super().__init__(pos)
         self.name: Name = name
-        self.kind: str = kind
+        self.kind: ObjectType = kind
         self.constraints: Constraint = constraints
         self.body: List[Statement] = body
+
+
+def is_atom(node: ASTNode):
+    if isinstance(node, Subscript):
+        return True
+    if isinstance(node, Name):
+        return True
+    if isinstance(node, Number):
+        return True
+
+    return False

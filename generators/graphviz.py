@@ -47,8 +47,9 @@ class Generator(ASTVisitor):
                 else:
                     self.current_node.properties.append(f'{field} = {value}')
 
-    def output(self, ast: Method):
-        self.visit(ast)
+    def visit_Method(self, node: Method):
+        self.generic_visit(node)
+
         data = ''
         for item in itertools.chain(self.nodes, self.edges):
             data += f'{item}\n'

@@ -4,11 +4,6 @@ from ccl_ast import *
 from ccl_errors import CCLSymbolError, CCLTypeError
 
 
-class ObjectType(Enum):
-    ATOM = 'Atom'
-    BOND = 'Bond'
-
-
 class ParameterType(Enum):
     ATOM = 'Atom'
     BOND = 'Bond'
@@ -68,7 +63,7 @@ class ExprSymbol(Symbol):
     def __init__(self, name: str, def_node: ASTNode, indices: Tuple[str, ...]):
         super().__init__(name, def_node)
         self.indices: Tuple[str, ...] = indices
-        self.rules: Dict[Constraint, Expression] = {}
+        self.rules: Dict[Optional[Constraint], Expression] = {}
 
     def __repr__(self):
         return f'ExprSymbol({self.name}, {self.indices})'
@@ -359,7 +354,7 @@ class SymbolTableBuilder(ASTVisitor):
                 node.result_type = NumericType.FLOAT
         else:
             raise CCLTypeError(node, f'Incompatible types for {node.op.value}: ' +
-                               '{node.left.result_type} and {node.right.result_type}')
+                               f'{node.left.result_type} and {node.right.result_type}')
 
     def visit_Sum(self, node: Sum):
         self.iterating_over.add(node.name.name)

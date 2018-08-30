@@ -1,13 +1,12 @@
 import sys
 import antlr4
-
 import antlr.CCLLexer
 import antlr.CCLParser
 
 from ccl_parser import Parser, CCLErrorListener
 from ccl_symboltable import SymbolTable
 from ccl_errors import CCLError
-from generators.graphviz import Generator
+from generators.latex import Generator
 
 if len(sys.argv) != 2:
     print('Not enough arguments')
@@ -27,7 +26,7 @@ try:
     ast = ccl_parser.visit(tree)
     print('AST:')
     ast.print_ast()
-    s = SymbolTable.create_from_ast(ast)
+    table = SymbolTable.create_from_ast(ast)
 except CCLError as e:
     print('\nERROR: ' + str(e.message))
     print(f'\n{e.line:2d}:', data.split('\n')[e.line - 1])
@@ -35,9 +34,8 @@ except CCLError as e:
     sys.exit(1)
 
 print('\nGlobal symbol table:')
-s.print()
+table.print()
 
-print('\nGraphviz source:')
-g = Generator()
-s = g.output(ast)
-print(s)
+print('\nLaTeX source:')
+g = Generator(table)
+print(g.visit(ast))

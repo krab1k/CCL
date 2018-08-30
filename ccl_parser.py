@@ -146,7 +146,7 @@ class Parser(CCLVisitor):
 
     def visitFor_each(self, ctx: CCLParser.For_eachContext):
         name = Name(self.get_pos(ctx.identifier), ctx.identifier.text, VarContext.STORE)
-        object_type = ctx.abtype.text.capitalize()
+        object_type = ObjectType(ctx.abtype.text.capitalize())
         if ctx.constraint() is not None:
             constraint = self.visit(ctx.constraint())
         else:
