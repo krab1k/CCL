@@ -158,7 +158,3 @@ class Parser(CCLVisitor):
             body.append(self.visit(statement))
 
         return ForEach(self.get_pos(ctx), name, object_type, constraint, body)
-
-
-
-

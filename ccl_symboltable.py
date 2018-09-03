@@ -265,11 +265,12 @@ class SymbolTableBuilder(ASTVisitor):
 
             node.result_type = NumericType.FLOAT
         elif isinstance(symbol, ParameterSymbol) and symbol.kind == ParameterType.BOND:
-            if len(node.indices) != 1:
-                raise CCLTypeError(node, f'Bond parameter {node.name.name} must have one index only')
-            if node.indices[0].result_type != ObjectType.BOND:
+            if len(node.indices) == 1 and node.indices[0].result_type != ObjectType.BOND:
+                raise CCLTypeError(node, f'Bond parameter {node.name.name} must be indexed with Bond')
+            if len(node.indices) == 2 and \
+                    node.indices[0].result_type != node.indices[1].result_type != ObjectType.ATOM:
                 raise CCLTypeError(node, f'Bond parameter {node.name.name} was indexed by {node.indices[0].result_type}'
-                                         ' not Bond')
+                                         ' not Bond or two Atoms')
 
             node.result_type = NumericType.FLOAT
         elif isinstance(symbol, VariableSymbol) and symbol.types:

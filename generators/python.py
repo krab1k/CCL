@@ -83,7 +83,8 @@ def {name}(self, {args}):
             if isinstance(s, ExprSymbol):
                 if len(s.rules) == 1:
                     code = f'    return {self.visit(s.rules[None])}'
-                    self.definitions.append(template.format(name=s.name, args='', code=code))
+                    indices = ', '.join(s.indices) if s.indices else ''
+                    self.definitions.append(template.format(name=s.name, args=indices, code=code))
                 else:
                     code = ''
                     for constraint, value in s.rules.items():
@@ -133,9 +134,13 @@ def {name}(self, {args}):
             name = 'charges' if symbol.name == 'q' else symbol.name
             indices = ', '.join(f'{self.visit(idx)}.index' for idx in node.indices)
             return f'{name}[{indices}]'
-        elif isinstance(symbol, ParameterSymbol):
-            if symbol.kind == ParameterType.ATOM:
+        elif isinstance(symbol, ParameterSymbol) and symbol.kind == ParameterType.ATOM:
                 return f'self.parameters.atom[\'{symbol.name}\']({node.indices[0].name})'
+        elif isinstance(symbol, ParameterSymbol) and symbol.kind == ParameterType.BOND:
+                if len(node.indices) == 1:
+                    return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].name})'
+                else:
+                    return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].name}, {node.indices[1].name})'
         elif isinstance(symbol, ExprSymbol):
             indices = ', '.join(f'{self.visit(idx)}' for idx in node.indices)
             return f'self.{symbol.name}({indices})'
@@ -215,7 +220,7 @@ def {name}(self, {args}):
 
     def visit_Sum(self, node: Sum):
         template = '''\
-def {name}(self, molecule, {args}):
+def {name}(self, {args}):
     total = 0
     objects = {objects}
     for {obj} in objects:
@@ -233,12 +238,15 @@ def {name}(self, molecule, {args}):
             if self.symbol_table.resolve(name) is None:
                 needed_names.append(name)
 
-        args = ', '.join(needed_names)
+        args = ', '.join(['molecule'] + needed_names)
         symbol = self.symbol_table.resolve(obj)
         old = self.resolving_node
         self.resolving_node = node
-        cond = self.visit(symbol.constraints)
+        if symbol.constraints is not None:
+            cond = ' if ' + self.visit(symbol.constraints)
+        else:
+            cond = ''
         self.resolving_node = old
-        objects = f'[{obj} for {obj} in molecule.{symbol.kind.value.lower()}s if {cond}]'
+        objects = f'[{obj} for {obj} in molecule.{symbol.kind.value.lower()}s{cond}]'
         self.definitions.append(template.format(name=fname, obj=obj, args=args, objects=objects, expr=expr))
-        return f'self.{fname}(molecule, {args})'
+        return f'self.{fname}({args})'

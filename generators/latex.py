@@ -173,6 +173,7 @@ class Generator(ASTVisitor):
         expressions_string = []
         strings = []
         if expressions:
+            self.inside_math = True
             for s in expressions:
                 if len(s.rules) == 1:
                     if s.indices:
@@ -182,7 +183,6 @@ class Generator(ASTVisitor):
                     expressions_string.append(f'${get_name(s.name)}{indices} = {self.visit(s.rules[None])}$')
                 else:
                     rules = ''
-                    self.inside_math = True
                     for constraint, value in s.rules.items():
                         if constraint:
                             c = '\\text{if }' + self.visit(constraint) + '\\\\'
@@ -191,9 +191,9 @@ class Generator(ASTVisitor):
                         value = self.visit(value)
                         rules += f'{value} & {c}\n'
                     indices = '_{' + ', '.join(idx for idx in s.indices) + '}'
-                    self.inside_math = False
                     expressions_string.append(f'${get_name(s.name)}{indices} = \n\\begin{{cases}}\n'
                                               f'{rules}\\end{{cases}}$')
+            self.inside_math = False
         if expressions_string:
             strings.append('\n\n\\noindent and\n\n$q$ is a vector of charges')
         else:
