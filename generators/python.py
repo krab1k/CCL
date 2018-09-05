@@ -9,6 +9,7 @@ import numpy as np
 
 from method import ChargeCalculationMethod
 from structures.molecule import Molecule
+import geometry
 
 
 class ChargeMethod(ChargeCalculationMethod):
@@ -144,6 +145,17 @@ def {name}(self, {args}):
         elif isinstance(symbol, ExprSymbol):
             indices = ', '.join(f'{self.visit(idx)}' for idx in node.indices)
             return f'self.{symbol.name}({indices})'
+        elif isinstance(symbol, FunctionSymbol):
+            if symbol.function.name == 'distance':
+                indices = ', '.join(f'{self.visit(idx)}' for idx in node.indices)
+                return f'geometry.distance({indices})'
+            elif symbol.function.name == 'vdw_radius':
+                name = self.visit(node.indices[0])
+                return f'{name}.element.vdw_radius'
+            else:
+                raise NotImplemented(f'Can\' translate function {s.function.name}')
+        else:
+            raise NotImplemented(f'Unknown symbol type {s}')
 
     def visit_UnaryOp(self, node: UnaryOp):
         return f'{node.op.value}' + self.visit(node.expr)

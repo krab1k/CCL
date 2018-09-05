@@ -103,7 +103,7 @@ class Generator(ASTVisitor):
 
         self.inside_math = False
         annotations = self.visit_SymbolTable()
-        return f'\\noindent ${statements}$\n\n\\vspace*{{5mm}}\\noindent where\n\n{annotations}'
+        return f'\\noindent ${statements}$\n\n\\vspace*{{5mm}}\\noindent where\n\n\\noindent {annotations}'
 
     def visit_BinaryLogicalOp(self, node: BinaryLogicalOp):
         left = self.visit(node.lhs)
@@ -150,6 +150,7 @@ class Generator(ASTVisitor):
         expressions = []
         atoms = []
         bonds = []
+        functions = []
         for s in self.symbol_table.symbols.values():
             if isinstance(s, ParameterSymbol):
                 if s.kind == ParameterType.ATOM:
@@ -167,6 +168,8 @@ class Generator(ASTVisitor):
                 expressions.append(s)
             elif isinstance(s, VariableSymbol):
                 pass  # We need only vector q
+            elif isinstance(s, FunctionSymbol):
+                functions.append(s)
             else:
                 raise RuntimeError(f'No suitable symbol type for {s}')
 
@@ -180,7 +183,7 @@ class Generator(ASTVisitor):
                         indices = '_{' + ', '.join(idx for idx in s.indices) + '}'
                     else:
                         indices = ''
-                    expressions_string.append(f'${get_name(s.name)}{indices} = {self.visit(s.rules[None])}$')
+                    expressions_string.append(f'${get_name(s.name)}{indices} = {self.visit(s.rules[None])}$\\\\')
                 else:
                     rules = ''
                     for constraint, value in s.rules.items():
@@ -198,6 +201,12 @@ class Generator(ASTVisitor):
             strings.append('\n\n\\noindent and\n\n$q$ is a vector of charges')
         else:
             strings.append('$q$ is a vector of charges')
+        if functions:
+            for s in functions:
+                if s.function.name == 'distance':
+                    strings.append(f'${get_name(s.name)}_{{i, j}}$ is a distance between atoms $i$ and $j$')
+                else:
+                    strings.append(f'${get_name(s.name)}$ is {s.function.comment}')
         if atom_parameters:
             if len(atom_parameters) == 1:
                 strings.append(f'${get_name(atom_parameters[0].name)}$ is an atom parameter')

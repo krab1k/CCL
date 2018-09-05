@@ -39,4 +39,3 @@ g = Generator(table)
 code = g.visit(ast)
 
 print(code)
-

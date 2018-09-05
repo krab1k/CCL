@@ -293,6 +293,13 @@ class ForEach(Statement):
         self.symbol_table = None
 
 
+class Property(Annotation):
+    def __init__(self, pos: Tuple[int, int], name: Name, prop: String):
+        super().__init__(pos)
+        self.name: Name = name
+        self.prop: String = prop
+
+
 def is_atom(node: ASTNode):
     if isinstance(node, Subscript):
         return True

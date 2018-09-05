@@ -84,12 +84,15 @@ class Parser(CCLVisitor):
         return String(self.get_pos(ctx), ctx.getText().strip('"'))
 
     def visitExprAnnotation(self, ctx: CCLParser.ExprAnnotationContext):
+        self._name_handling = VarContext.LOAD
         lhs = self.visit(ctx.var())
         rhs = self.visit(ctx.expr())
         if ctx.constraint() is not None:
             constraint = self.visit(ctx.constraint())
         else:
             constraint = None
+
+        self._name_handling = VarContext.STORE
         return ExprAnnotation(self.get_pos(ctx), lhs, rhs, constraint)
 
     def visitAssign(self, ctx: CCLParser.AssignContext):
@@ -158,3 +161,8 @@ class Parser(CCLVisitor):
             body.append(self.visit(statement))
 
         return ForEach(self.get_pos(ctx), name, object_type, constraint, body)
+
+    def visitPropertyAnnotation(self, ctx: CCLParser.PropertyAnnotationContext):
+        name = Name(self.get_pos(ctx.name), ctx.name.text, VarContext.ANNOTATION)
+        prop = String(self.get_pos(ctx.prop), ctx.prop.text)
+        return Property(self.get_pos(ctx), name, prop)

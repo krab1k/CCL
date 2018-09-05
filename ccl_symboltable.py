@@ -15,6 +15,19 @@ class NumericType(Enum):
     FLOAT = 'Float'
 
 
+class Function:
+    def __init__(self, name: str, arg_types: Tuple[ObjectType, ...], result_type: NumericType, comment: str):
+        self.name: str = name
+        self.arg_types: Tuple[ObjectType, ...] = arg_types
+        self.result_type: NumericType = result_type
+        self.comment: str = comment
+
+
+functions = {'distance': Function('distance', (ObjectType.ATOM, ObjectType.ATOM), NumericType.FLOAT, 'distance'),
+             'covradius': Function('cov_radius', (ObjectType.ATOM,), NumericType.FLOAT, 'covalent radius'),
+             'vdwradius': Function('vdw_radius', (ObjectType.ATOM,), NumericType.FLOAT, 'van der Waals radius')}
+
+
 class Symbol:
     def __init__(self, name: str, def_node: Optional[ASTNode]):
         self.name: str = name
@@ -56,7 +69,13 @@ class ObjectSymbol(Symbol):
 
 
 class FunctionSymbol(Symbol):
-    pass
+    def __init__(self, name: str, def_node: Optional[ASTNode], function: Function):
+        super().__init__(name, def_node)
+        self.function: Function = function
+
+    @property
+    def symbol_type(self):
+        return self.function.result_type
 
 
 class ExprSymbol(Symbol):
@@ -169,11 +188,17 @@ class SymbolTableBuilder(ASTVisitor):
         self.symbol_table: SymbolTable = SymbolTable(None)
         self.current_table: SymbolTable = self.symbol_table
 
-        self.iterating_over: Set[str] = set()
-        self.inside_constraint = False
+        self._iterating_over: Set[str] = set()
+        self.indices_mapping: Dict[str, str] = dict()
+        self.inside_constraint: bool = False
 
         # Define common symbols
         self.current_table.define(VariableSymbol('q', None, NumericType.FLOAT, (ObjectType.ATOM,)))
+        self.current_table.define(FunctionSymbol('R', None, functions['distance']))
+
+    @property
+    def iterating_over(self):
+            return {self.indices_mapping.get(key, key) for key in self._iterating_over}
 
     def visit_Method(self, node: Method):
         node.symbol_table = self.symbol_table
@@ -209,12 +234,12 @@ class SymbolTableBuilder(ASTVisitor):
         self.current_table = SymbolTable(self.current_table)
         node.symbol_table = self.current_table
         self.current_table.define(ObjectSymbol(name, node, ObjectType(node.kind), node.constraints))
-        self.iterating_over.add(node.name.name)
+        self._iterating_over.add(node.name.name)
 
         for statement in node.body:
             self.visit(statement)
 
-        self.iterating_over.remove(node.name.name)
+        self._iterating_over.remove(node.name.name)
         self.current_table = self.current_table.parent
 
     def visit_ExprAnnotation(self, node: ExprAnnotation):
@@ -242,9 +267,7 @@ class SymbolTableBuilder(ASTVisitor):
                         self.inside_constraint = False
                 node.result_type = symbol.symbol_type
             elif isinstance(symbol, ExprSymbol):
-                expr = list(symbol.rules.values())[0]
-                self.visit(expr)
-                node.result_type = expr.result_type
+                pass
             else:
                 node.result_type = symbol.symbol_type
         if node.ctx == VarContext.LOAD and symbol is None:
@@ -252,19 +275,21 @@ class SymbolTableBuilder(ASTVisitor):
 
     def visit_Subscript(self, node: Subscript):
         self.visit(node.name)
-        for idx in node.indices:
-            self.visit(idx)
 
         symbol = self.current_table.resolve(node.name.name)
         if isinstance(symbol, ParameterSymbol) and symbol.kind == ParameterType.ATOM:
             if len(node.indices) != 1:
                 raise CCLTypeError(node, f'Atom parameter {node.name.name} must have one index only')
+
+            self.visit(node.indices[0])
             if node.indices[0].result_type != ObjectType.ATOM:
                 raise CCLTypeError(node, f'Atom parameter {node.name.name} was indexed by {node.indices[0].result_type}'
                                          ' not Atom')
 
             node.result_type = NumericType.FLOAT
         elif isinstance(symbol, ParameterSymbol) and symbol.kind == ParameterType.BOND:
+            for idx in node.indices:
+                self.visit(idx)
             if len(node.indices) == 1 and node.indices[0].result_type != ObjectType.BOND:
                 raise CCLTypeError(node, f'Bond parameter {node.name.name} must be indexed with Bond')
             if len(node.indices) == 2 and \
@@ -274,17 +299,31 @@ class SymbolTableBuilder(ASTVisitor):
 
             node.result_type = NumericType.FLOAT
         elif isinstance(symbol, VariableSymbol) and symbol.types:
+            for idx in node.indices:
+                self.visit(idx)
             index_types = tuple(idx.result_type for idx in node.indices)
             if symbol.types != index_types:
                 raise CCLTypeError(node,
                                    f'Cannot index {node.name.name} with {index_types}, expected was {symbol.types}')
 
             node.result_type = symbol.kind
+        elif isinstance(symbol, FunctionSymbol):
+            for idx in node.indices:
+                self.visit(idx)
+            index_types = tuple(idx.result_type for idx in node.indices)
+            if symbol.function.arg_types != index_types:
+                raise CCLTypeError(node,
+                                   f'Cannot index {node.name.name} with {index_types}, expected was {symbol.arg_types}')
+            node.result_type = symbol.symbol_type
         elif isinstance(symbol, ExprSymbol):
             types = set()
             for constraint, expr in symbol.rules.items():
+                node_indices = [idx.name for idx in node.indices]
+                self.indices_mapping.update({ni: ei for ni, ei in zip(node_indices, symbol.indices)})
                 self.visit(expr)
                 types.add(expr.result_type)
+                for name in node_indices:
+                    self.indices_mapping.pop(name)
 
             if len(types) > 1:
                 raise CCLTypeError(node, f'Expressions for {node.name.name} have different types')
@@ -370,12 +409,20 @@ class SymbolTableBuilder(ASTVisitor):
                                f'{node.left.result_type} and {node.right.result_type}')
 
     def visit_Sum(self, node: Sum):
-        self.iterating_over.add(node.name.name)
+        self._iterating_over.add(node.name.name)
         self.visit(node.name)
         self.visit(node.expr)
-        self.iterating_over.remove(node.name.name)
+        self._iterating_over.remove(node.name.name)
 
         if node.name.result_type not in ObjectType:
             raise CCLTypeError(node, f'Sum index has to be Atom or Bond, not {node.name.result_type}')
 
         node.result_type = node.expr.result_type
+
+    def visit_Property(self, node: Property):
+        fname = node.prop.s
+        try:
+            f = functions[fname]
+        except KeyError:
+            raise CCLSymbolError(node, f'Function/property {fname} not implemented')
+        self.current_table.define(FunctionSymbol(node.name.name, node, f))
