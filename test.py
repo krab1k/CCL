@@ -1,12 +1,12 @@
 import sys
 import antlr4
-import antlr.CCLLexer
-import antlr.CCLParser
+import ccl.antlr.CCLLexer
+import ccl.antlr.CCLParser
 
-from ccl_parser import Parser, CCLErrorListener
-from ccl_symboltable import SymbolTable
-from ccl_errors import CCLError
-from generators.python import Generator
+from ccl.parser import Parser, CCLErrorListener
+from ccl.symboltable import SymbolTable
+from ccl.errors import CCLError
+from ccl.generators.python import Python
 
 if len(sys.argv) != 2:
     print('Not enough arguments')
@@ -15,9 +15,9 @@ if len(sys.argv) != 2:
 with open(sys.argv[1]) as f:
     data = f.read()
 
-lexer = antlr.CCLLexer.CCLLexer(antlr4.InputStream(data))
+lexer = ccl.antlr.CCLLexer.CCLLexer(antlr4.InputStream(data))
 token_stream = antlr4.CommonTokenStream(lexer)
-parser = antlr.CCLParser.CCLParser(token_stream)
+parser = ccl.antlr.CCLParser.CCLParser(token_stream)
 parser._listeners = [CCLErrorListener()]
 
 try:
@@ -35,7 +35,7 @@ print('\n*** CCL ****\n')
 print(data)
 
 print('\n*** Python ***\n')
-g = Generator(table)
+g = Python(table)
 code = g.visit(ast)
 
 print(code)

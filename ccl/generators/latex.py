@@ -1,13 +1,16 @@
-from ccl_symboltable import *
+from typing import Union
+
+from ccl.symboltable import *
+from ccl.ast import *
 
 greek_letters = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu',
                  'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon', 'Phi', 'Chi', 'Psi', 'Omega']
 
 
-__all__ = ['Generator']
+__all__ = ['Latex']
 
 
-def get_name(name: str):
+def get_name(name: str) -> str:
     if name in greek_letters or name.capitalize() in greek_letters:
         return f'\{name}'
     else:
@@ -15,24 +18,24 @@ def get_name(name: str):
 
 
 # noinspection PyPep8Naming
-class Generator(ASTVisitor):
-    def __init__(self, symbol_table: SymbolTable):
+class Latex(ASTVisitor):
+    def __init__(self, symbol_table: SymbolTable) -> None:
         super().__init__()
         self.depth = 0
         self.symbol_table: SymbolTable = symbol_table
         self.inside_math = True
 
-    def visit_Name(self, node: Name):
+    def visit_Name(self, node: Name) -> str:
         plain_name = get_name(node.name)
         if self.inside_math:
             return plain_name
         else:
             return f'${plain_name}$'
 
-    def visit_Number(self, node: Number):
+    def visit_Number(self, node: Number) -> Union[int, float]:
         return node.n
 
-    def visit_For(self, node: For):
+    def visit_For(self, node: For) -> str:
         name_str = self.visit(node.name)
         value_from = self.visit(node.value_from)
         value_to = self.visit(node.value_to)
@@ -45,7 +48,7 @@ class Generator(ASTVisitor):
         self.depth -= 1
         return f'\\text{{for }} {value_from} \leq {name_str} \leq {value_to}:\n{body}'
 
-    def visit_ForEach(self, node: ForEach):
+    def visit_ForEach(self, node: ForEach) -> str:
         name_str = self.visit(node.name)
         kind = node.kind.value.lower()
         self.depth += 1
@@ -57,13 +60,13 @@ class Generator(ASTVisitor):
         self.depth -= 1
         return f'\\forall \\text{{ {kind} }} {name_str}: {body}'
 
-    def visit_Assign(self, node: Assign):
+    def visit_Assign(self, node: Assign) -> str:
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
 
         return f'{lhs} = {rhs}'
 
-    def visit_BinaryOp(self, node: BinaryOp):
+    def visit_BinaryOp(self, node: BinaryOp) -> str:
         left = self.visit(node.left)
         right = self.visit(node.right)
 
@@ -85,18 +88,18 @@ class Generator(ASTVisitor):
 
         return f'{left} {op} {right}'
 
-    def visit_Sum(self, node: Sum):
+    def visit_Sum(self, node: Sum) -> str:
         name = self.visit(node.name)
         expr = self.visit(node.expr)
 
         return f'\sum_{{{name}}}\\left({expr}\\right)'
 
-    def visit_Subscript(self, node: Subscript):
+    def visit_Subscript(self, node: Subscript) -> str:
         name = self.visit(node.name)
         indices = ', '.join(self.visit(idx) for idx in node.indices)
         return f'{name}_{{{indices}}}'
 
-    def visit_Method(self, node: Method):
+    def visit_Method(self, node: Method) -> str:
         statements = ''
         for s in node.statements:
             statements += f'{self.visit(s)}\n'
@@ -105,13 +108,13 @@ class Generator(ASTVisitor):
         annotations = self.visit_SymbolTable()
         return f'\\noindent ${statements}$\n\n\\vspace*{{5mm}}\\noindent where\n\n\\noindent {annotations}'
 
-    def visit_BinaryLogicalOp(self, node: BinaryLogicalOp):
+    def visit_BinaryLogicalOp(self, node: BinaryLogicalOp) -> str:
         left = self.visit(node.lhs)
         right = self.visit(node.rhs)
 
         return f'{left} {node.op.value.lower()} {right}'
 
-    def visit_RelOp(self, node: RelOp):
+    def visit_RelOp(self, node: RelOp) -> str:
         self.inside_math = True
         left = self.visit(node.lhs)
         right = self.visit(node.rhs)
@@ -119,18 +122,18 @@ class Generator(ASTVisitor):
 
         return f'${left} {node.op.value} {right}$'
 
-    def visit_UnaryOp(self, node: UnaryOp):
+    def visit_UnaryOp(self, node: UnaryOp) -> str:
         op = UnaryOp.Ops(node.op).value
         return f'{op}' + self.visit(node.expr)
 
-    def visit_UnaryLogicalOp(self, node: UnaryLogicalOp):
+    def visit_UnaryLogicalOp(self, node: UnaryLogicalOp) -> str:
         op = UnaryLogicalOp.Ops(node.op).value
         return f'{op.lower()} ' + self.visit(node.constraint)
 
-    def visit_String(self, node: String):
+    def visit_String(self, node: String) -> str:
         return f'\\text{{{node.s}}}'
 
-    def visit_Predicate(self, node: Predicate):
+    def visit_Predicate(self, node: Predicate) -> str:
         if node.name == 'bonded':
             a1 = self.visit(node.args[0])
             a2 = self.visit(node.args[1])
@@ -143,7 +146,7 @@ class Generator(ASTVisitor):
             args = ', '.join(self.visit(arg) for arg in node.args)
             return f'\\text{{{node.name}}}({args})'
 
-    def visit_SymbolTable(self):
+    def visit_SymbolTable(self) -> str:
         atom_parameters = []
         bond_parameters = []
         common_parameters = []

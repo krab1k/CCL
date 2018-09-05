@@ -1,8 +1,8 @@
-from ccl_ast import ASTNode
+from ccl.ast import ASTNode
 
 
 class CCLError(Exception):
-    def __init__(self, node: ASTNode, message: str):
+    def __init__(self, node: ASTNode, message: str) -> None:
         super().__init__()
         self.line: int = node._line
         self.column: int = node._column

@@ -1,7 +1,8 @@
-from typing import Dict, Set
+from typing import Dict, Set, NoReturn, Tuple, Optional
+from enum import Enum
 
-from ccl_ast import *
-from ccl_errors import CCLSymbolError, CCLTypeError
+from ccl.ast import *
+from ccl.errors import CCLSymbolError, CCLTypeError
 
 
 class ParameterType(Enum):
@@ -16,7 +17,7 @@ class NumericType(Enum):
 
 
 class Function:
-    def __init__(self, name: str, arg_types: Tuple[ObjectType, ...], result_type: NumericType, comment: str):
+    def __init__(self, name: str, arg_types: Tuple[ObjectType, ...], result_type: NumericType, comment: str) -> None:
         self.name: str = name
         self.arg_types: Tuple[ObjectType, ...] = arg_types
         self.result_type: NumericType = result_type
@@ -29,21 +30,21 @@ functions = {'distance': Function('distance', (ObjectType.ATOM, ObjectType.ATOM)
 
 
 class Symbol:
-    def __init__(self, name: str, def_node: Optional[ASTNode]):
+    def __init__(self, name: str, def_node: Optional[ASTNode]) -> None:
         self.name: str = name
         self.def_node: Optional[ASTNode] = def_node
 
     @property
-    def symbol_type(self):
+    def symbol_type(self) -> NoReturn:
         raise NotImplemented('We should not get here!')
 
 
 class ParameterSymbol(Symbol):
-    def __init__(self, name, def_node: ASTNode, kind: ParameterType):
+    def __init__(self, name, def_node: ASTNode, kind: ParameterType) -> None:
         super().__init__(name, def_node)
         self.kind: ParameterType = kind
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'ParameterSymbol({self.name}, {self.kind.value})'
 
     @property
@@ -51,16 +52,16 @@ class ParameterSymbol(Symbol):
         if self.kind == ParameterType.COMMON:
             return NumericType.FLOAT
         else:
-            return f'{self.kind.value}Parameter'
+            return self.kind
 
 
 class ObjectSymbol(Symbol):
-    def __init__(self, name: str, def_node: ASTNode, kind: ObjectType, constraints: Constraint):
+    def __init__(self, name: str, def_node: ASTNode, kind: ObjectType, constraints: Constraint) -> None:
         super().__init__(name, def_node)
         self.kind: ObjectType = kind
         self.constraints: Constraint = constraints
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'ObjectSymbol({self.name}, {self.kind.value}, {self.constraints})'
 
     @property
@@ -69,39 +70,40 @@ class ObjectSymbol(Symbol):
 
 
 class FunctionSymbol(Symbol):
-    def __init__(self, name: str, def_node: Optional[ASTNode], function: Function):
+    def __init__(self, name: str, def_node: Optional[ASTNode], function: Function) -> None:
         super().__init__(name, def_node)
         self.function: Function = function
 
     @property
-    def symbol_type(self):
+    def symbol_type(self) -> NumericType:
         return self.function.result_type
 
 
 class ExprSymbol(Symbol):
-    def __init__(self, name: str, def_node: ASTNode, indices: Tuple[str, ...]):
+    def __init__(self, name: str, def_node: ASTNode, indices: Tuple[str, ...]) -> None:
         super().__init__(name, def_node)
         self.indices: Tuple[str, ...] = indices
         self.rules: Dict[Optional[Constraint], Expression] = {}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'ExprSymbol({self.name}, {self.indices})'
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'ExprSymbol({self.name}, {self.indices}) = {self.rules}'
 
 
 class VariableSymbol(Symbol):
-    def __init__(self, name: str, def_node: Optional[ASTNode], kind: NumericType, types: Tuple[ObjectType, ...]):
+    def __init__(self, name: str, def_node: Optional[ASTNode], kind: NumericType, types: Tuple[ObjectType, ...]) \
+            -> None:
         super().__init__(name, def_node)
         self.kind: NumericType = kind
         self.types: Tuple[ObjectType, ...] = types
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'VariableSymbol({self.name}, {self.kind.value}, {self.types})'
 
     @property
-    def dim(self):
+    def dim(self) -> int:
         return len(self.types)
 
     @property
@@ -113,11 +115,11 @@ class VariableSymbol(Symbol):
 
 
 class SymbolTable:
-    def __init__(self, parent: Optional['SymbolTable']):
+    def __init__(self, parent: Optional['SymbolTable']) -> None:
         self.parent: Optional['SymbolTable'] = parent
         self.symbols: Dict[str, Symbol] = {}
 
-    def resolve(self, s: str):
+    def resolve(self, s: str) -> Optional[Symbol]:
         if s in self.symbols:
             return self.symbols[s]
 
@@ -126,13 +128,13 @@ class SymbolTable:
 
         return None
 
-    def define(self, symbol: Symbol):
+    def define(self, symbol: Symbol) -> None:
         if self.resolve(symbol.name):
             raise CCLSymbolError(symbol.def_node, f'Symbol {symbol.name} already defined.')
 
         self.symbols[symbol.name] = symbol
 
-    def define_expr(self, symbol: ExprSymbol, constraint: Optional[Constraint], value: Expression):
+    def define_expr(self, symbol: ExprSymbol, constraint: Optional[Constraint], value: Expression) -> None:
         resolved_symbol = self.resolve(symbol.name)
         if resolved_symbol is None:
             self.symbols[symbol.name] = symbol
@@ -149,14 +151,14 @@ class SymbolTable:
         else:
             resolved_symbol.rules[constraint] = value
 
-    def find_parent_table(self, symbols: Set[str]):
+    def find_parent_table(self, symbols: Set[str]) -> 'SymbolTable':
         if not symbols:
             return self
 
         return self.parent.find_parent_table(symbols - set(self.symbols.keys()))
 
     @classmethod
-    def create_from_ast(cls, ast: Method):
+    def create_from_ast(cls, ast: Method) -> 'SymbolTable':
         visitor = SymbolTableBuilder()
         visitor.visit(ast)
         table = visitor.symbol_table
@@ -164,17 +166,17 @@ class SymbolTable:
         return table
 
     @classmethod
-    def get_table(cls, node: ASTNode):
+    def get_table(cls, node: ASTNode) -> 'SymbolTable':
         if hasattr(node, 'symbol_table'):
             return node.symbol_table
         else:
             return cls.get_table(node.parent)
 
-    def print(self):
+    def print(self) -> None:
         for symbol in self.symbols.values():
             print(symbol)
 
-    def check_expr_annotations(self):
+    def check_expr_annotations(self) -> None:
         for symbol in self.symbols.values():
             if isinstance(symbol, ExprSymbol):
                 if all(symbol.rules.keys()):
@@ -183,7 +185,7 @@ class SymbolTable:
 
 # noinspection PyPep8Naming
 class SymbolTableBuilder(ASTVisitor):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.symbol_table: SymbolTable = SymbolTable(None)
         self.current_table: SymbolTable = self.symbol_table
@@ -197,10 +199,10 @@ class SymbolTableBuilder(ASTVisitor):
         self.current_table.define(FunctionSymbol('R', None, functions['distance']))
 
     @property
-    def iterating_over(self):
+    def iterating_over(self) -> set:
             return {self.indices_mapping.get(key, key) for key in self._iterating_over}
 
-    def visit_Method(self, node: Method):
+    def visit_Method(self, node: Method) -> None:
         node.symbol_table = self.symbol_table
         for a in node.annotations:
             self.visit(a)
@@ -208,13 +210,13 @@ class SymbolTableBuilder(ASTVisitor):
         for s in node.statements:
             self.visit(s)
 
-    def visit_ParameterAnnotation(self, node: ParameterAnnotation):
+    def visit_ParameterAnnotation(self, node: ParameterAnnotation) -> None:
         self.current_table.define(ParameterSymbol(node.name.name, node, ParameterType(node.kind)))
 
-    def visit_ObjectAnnotation(self, node: ObjectAnnotation):
+    def visit_ObjectAnnotation(self, node: ObjectAnnotation) -> None:
         self.current_table.define(ObjectSymbol(node.name.name, node, ObjectType(node.kind), node.constraints))
 
-    def visit_For(self, node: For):
+    def visit_For(self, node: For) -> None:
         self.visit(node.value_from)
         self.visit(node.value_to)
         if node.value_from.result_type != NumericType.INT:
@@ -229,7 +231,7 @@ class SymbolTableBuilder(ASTVisitor):
 
         self.current_table = self.current_table.parent
 
-    def visit_ForEach(self, node: ForEach):
+    def visit_ForEach(self, node: ForEach) -> None:
         name = node.name.name
         self.current_table = SymbolTable(self.current_table)
         node.symbol_table = self.current_table
@@ -242,7 +244,7 @@ class SymbolTableBuilder(ASTVisitor):
         self._iterating_over.remove(node.name.name)
         self.current_table = self.current_table.parent
 
-    def visit_ExprAnnotation(self, node: ExprAnnotation):
+    def visit_ExprAnnotation(self, node: ExprAnnotation) -> None:
         if isinstance(node.lhs, Name):
             if node.constraints:
                 raise CCLSymbolError(node, f'Constraints not possible for expression {node.lhs.name}')
@@ -253,7 +255,7 @@ class SymbolTableBuilder(ASTVisitor):
         else:
             raise RuntimeError('We should not get here')
 
-    def visit_Name(self, node: Name):
+    def visit_Name(self, node: Name) -> None:
         symbol = self.current_table.resolve(node.name)
         if symbol:
             if isinstance(symbol, ObjectSymbol):
@@ -273,7 +275,7 @@ class SymbolTableBuilder(ASTVisitor):
         if node.ctx == VarContext.LOAD and symbol is None:
             raise CCLSymbolError(node, f'Symbol {node.name} used but not defined')
 
-    def visit_Subscript(self, node: Subscript):
+    def visit_Subscript(self, node: Subscript) -> None:
         self.visit(node.name)
 
         symbol = self.current_table.resolve(node.name.name)
@@ -313,7 +315,8 @@ class SymbolTableBuilder(ASTVisitor):
             index_types = tuple(idx.result_type for idx in node.indices)
             if symbol.function.arg_types != index_types:
                 raise CCLTypeError(node,
-                                   f'Cannot index {node.name.name} with {index_types}, expected was {symbol.arg_types}')
+                                   f'Cannot index {node.name.name} with {index_types}, expected was'
+                                   f'{symbol.function.arg_types}')
             node.result_type = symbol.symbol_type
         elif isinstance(symbol, ExprSymbol):
             types = set()
@@ -332,7 +335,7 @@ class SymbolTableBuilder(ASTVisitor):
         else:
             raise CCLTypeError(node, f'Cannot index type {node.name.result_type}')
 
-    def visit_Assign(self, node: Assign):
+    def visit_Assign(self, node: Assign) -> None:
         def check_compatible_types(lt, rt):
             if (rt == lt and rt in NumericType) or (lt == NumericType.FLOAT and rt == NumericType.INT):
                 pass
@@ -374,25 +377,25 @@ class SymbolTableBuilder(ASTVisitor):
         else:
             raise RuntimeError('We should not get here.')
 
-    def visit_PredicateConstraint(self, node: Predicate):
+    def visit_PredicateConstraint(self, node: Predicate) -> None:
         # TODO check for predicate name
         for arg in node.args:
             if isinstance(arg, Name) and not self.current_table.resolve(arg.name):
                 raise CCLSymbolError(node, f'Predicate argument {arg.name} unknown')
 
-    def visit_Number(self, node: Number):
+    def visit_Number(self, node: Number) -> None:
         if isinstance(node.n, int):
             node.result_type = NumericType.INT
         else:
             node.result_type = NumericType.FLOAT
 
-    def visit_UnaryOp(self, node: UnaryOp):
+    def visit_UnaryOp(self, node: UnaryOp) -> None:
         self.visit(node.expr)
         if node.expr.result_type not in NumericType:
             raise CCLTypeError(node, f'Incompatible type for unary {node.op}')
         node.result_type = node.expr.result_type
 
-    def visit_BinaryOp(self, node: BinaryOp):
+    def visit_BinaryOp(self, node: BinaryOp) -> None:
         self.visit(node.left)
         self.visit(node.right)
 
@@ -408,7 +411,7 @@ class SymbolTableBuilder(ASTVisitor):
             raise CCLTypeError(node, f'Incompatible types for {node.op.value}: ' +
                                f'{node.left.result_type} and {node.right.result_type}')
 
-    def visit_Sum(self, node: Sum):
+    def visit_Sum(self, node: Sum) -> None:
         self._iterating_over.add(node.name.name)
         self.visit(node.name)
         self.visit(node.expr)
@@ -419,7 +422,7 @@ class SymbolTableBuilder(ASTVisitor):
 
         node.result_type = node.expr.result_type
 
-    def visit_Property(self, node: Property):
+    def visit_Property(self, node: Property) -> None:
         fname = node.prop.s
         try:
             f = functions[fname]

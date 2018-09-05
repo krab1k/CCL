@@ -1,7 +1,9 @@
-from ccl_symboltable import *
+from typing import List, Union
 
+from ccl.symboltable import *
+from ccl.ast import *
 
-__all__ = ['Generator']
+__all__ = ['Python']
 
 
 python_template = '''\
@@ -29,19 +31,19 @@ class ChargeMethod(ChargeCalculationMethod):
 
 
 # noinspection PyPep8Naming
-class Generator(ASTVisitor):
-    def __init__(self, symbol_table: SymbolTable):
+class Python(ASTVisitor):
+    def __init__(self, symbol_table: SymbolTable) -> None:
         super().__init__()
         self.symbol_table: SymbolTable = symbol_table
         self.definitions: List[str] = []
-        self.depth = 2
-        self.sum_count = 0
-        self.resolving_node = None
+        self.depth: int = 2
+        self.sum_count: int = 0
+        self.resolving_node: Optional[ASTNode] = None
 
-    def p(self, string: str):
+    def p(self, string: str) -> str:
         return ' ' * self.depth * 4 + string
 
-    def define_new_symbols(self, symbol_table: SymbolTable):
+    def define_new_symbols(self, symbol_table: SymbolTable) -> str:
         code = []
         for symbol in symbol_table.symbols.values():
             if isinstance(symbol, VariableSymbol) and symbol.types:
@@ -51,13 +53,13 @@ class Generator(ASTVisitor):
                         sizes.append('n')
                     else:
                         sizes.append('len(molecule.bonds)')
-                sizes = ', '.join(sizes)
+                sizes_str = ', '.join(sizes)
                 if len(symbol.types) > 1:
-                    sizes = f'({sizes})'
-                code.append(self.p(f'{symbol.name} = np.zeros({sizes}, np.float_)'))
+                    sizes_str = f'({sizes})'
+                code.append(self.p(f'{symbol.name} = np.zeros({sizes_str}, np.float_)'))
         return '\n'.join(code) + '\n' if code else ''
 
-    def get_parameters(self):
+    def get_parameters(self)-> Tuple[str, str, str]:
         atom_parameters = []
         bond_parameters = []
         common_parameters = []
@@ -70,12 +72,12 @@ class Generator(ASTVisitor):
                 else:
                     common_parameters.append(s.name)
 
-        atom_parameters = ', '.join(f'\'{s}\'' for s in atom_parameters)
-        bond_parameters = ', '.join(f'\'{s}\'' for s in bond_parameters)
-        common_parameters = ', '.join(f'\'{s}\'' for s in common_parameters)
-        return atom_parameters, bond_parameters, common_parameters
+        atom_parameters_str = ', '.join(f'\'{s}\'' for s in atom_parameters)
+        bond_parameters_str = ', '.join(f'\'{s}\'' for s in bond_parameters)
+        common_parameters_str = ', '.join(f'\'{s}\'' for s in common_parameters)
+        return atom_parameters_str, bond_parameters_str, common_parameters_str
 
-    def process_expressions(self):
+    def process_expressions(self) -> None:
         template = '''\
 def {name}(self, {args}):
 {code}
@@ -99,7 +101,7 @@ def {name}(self, {args}):
                     indices = ', '.join(s.indices)
                     self.definitions.append(template.format(name=s.name, args=indices, code=code))
 
-    def visit_Method(self, node: Method):
+    def visit_Method(self, node: Method) -> str:
         code_lines = []
         self.process_expressions()
         for statement in node.statements:
@@ -110,23 +112,23 @@ def {name}(self, {args}):
         return python_template.format(defs=defs, code=code, atom_parameters=atom_parameters,
                                       bond_parameters=bond_parameters, common_parameters=common_parameters)
 
-    def visit_Assign(self, node: Assign):
+    def visit_Assign(self, node: Assign) -> str:
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
 
         return self.p(f'{lhs} = {rhs}')
 
-    def visit_Number(self, node: Number):
+    def visit_Number(self, node: Number) -> Union[int, float]:
         return node.n
 
-    def visit_Name(self, node: Name):
+    def visit_Name(self, node: Name) -> str:
         symbol = SymbolTable.get_table(node).resolve(node.name)
         if isinstance(symbol, ExprSymbol):
             return f'self.{node.name}()'
         else:
             return node.name
 
-    def visit_Subscript(self, node: Subscript):
+    def visit_Subscript(self, node: Subscript) -> str:
         if self.resolving_node is not None:
             symbol = SymbolTable.get_table(self.resolving_node).resolve(node.name.name)
         else:
@@ -153,14 +155,14 @@ def {name}(self, {args}):
                 name = self.visit(node.indices[0])
                 return f'{name}.element.vdw_radius'
             else:
-                raise NotImplemented(f'Can\' translate function {s.function.name}')
+                raise NotImplemented(f'Can\' translate function {symbol.function.name}')
         else:
-            raise NotImplemented(f'Unknown symbol type {s}')
+            raise NotImplemented(f'Unknown symbol type {symbol}')
 
-    def visit_UnaryOp(self, node: UnaryOp):
+    def visit_UnaryOp(self, node: UnaryOp) -> str:
         return f'{node.op.value}' + self.visit(node.expr)
 
-    def visit_BinaryOp(self, node: BinaryOp):
+    def visit_BinaryOp(self, node: BinaryOp) -> str:
         left = self.visit(node.left)
         right = self.visit(node.right)
         if not is_atom(node.left):
@@ -174,7 +176,7 @@ def {name}(self, {args}):
 
         return f'{left} {op} {right}'
 
-    def visit_For(self, node: For):
+    def visit_For(self, node: For) -> str:
         value_from = self.visit(node.value_from)
         value_to = self.visit(node.value_to)
         name = self.visit(node.name)
@@ -188,7 +190,7 @@ def {name}(self, {args}):
         self.depth -= 1
         return self.p(f'for {name} in range({value_from}, {value_to + 1}):\n{defines}{code}')
 
-    def visit_ForEach(self, node: ForEach):
+    def visit_ForEach(self, node: ForEach) -> str:
         self.depth += 1
         statements = []
         name = self.visit(node.name)
@@ -201,26 +203,26 @@ def {name}(self, {args}):
         kind = ObjectType(node.kind).value.lower()
         return self.p(f'for {name} in molecule.{kind}s:\n{defines}{code}')
 
-    def visit_BinaryLogicalOp(self, node: BinaryLogicalOp):
+    def visit_BinaryLogicalOp(self, node: BinaryLogicalOp) -> str:
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
         op = node.op.value.lower()
         return f'{lhs} {op} {rhs}'
 
-    def visit_UnaryLogicalOp(self, node: UnaryLogicalOp):
+    def visit_UnaryLogicalOp(self, node: UnaryLogicalOp) -> str:
         expr = self.visit(node.constraint)
         return f'{node.op.value.lower()} {expr}'
 
-    def visit_RelOp(self, node: RelOp):
+    def visit_RelOp(self, node: RelOp) -> str:
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
         op = node.op.value
         return f'{lhs} {op} {rhs}'
 
-    def visit_String(self, node: String):
+    def visit_String(self, node: String) -> str:
         return f'\'{node.s}\''
 
-    def visit_Predicate(self, node: Predicate):
+    def visit_Predicate(self, node: Predicate) -> str:
         arg_list = [self.visit(arg) for arg in node.args]
         args = ', '.join(arg_list)
         if node.name == 'bonded':
@@ -230,7 +232,7 @@ def {name}(self, {args}):
         else:
             return f'{node.name}({args})'
 
-    def visit_Sum(self, node: Sum):
+    def visit_Sum(self, node: Sum) -> str:
         template = '''\
 def {name}(self, {args}):
     total = 0

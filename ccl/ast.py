@@ -1,5 +1,11 @@
-from typing import List, Union, Tuple, Optional, TypeVar
+from typing import List, Union, Tuple, Optional, Set, Generator, Any
 from enum import Enum
+
+
+__all__ = ['Annotation', 'Assign', 'ASTNode', 'ASTVisitor', 'BinaryLogicalOp', 'BinaryOp', 'Constraint',
+           'ExprAnnotation', 'Expression', 'For', 'ForEach', 'Method', 'Name', 'NameGetter', 'Number',
+           'ObjectAnnotation', 'ObjectType', 'ParameterAnnotation', 'ParentSetter', 'Predicate', 'Property', 'RelOp',
+           'Statement', 'String', 'Subscript', 'Sum', 'UnaryLogicalOp', 'UnaryOp', 'VarContext', 'is_atom']
 
 
 class VarContext(Enum):
@@ -16,15 +22,15 @@ class ObjectType(Enum):
 class ASTNode:
     _fields = ()
 
-    def __init__(self, pos: Tuple[int, int]):
+    def __init__(self, pos: Tuple[int, int]) -> None:
         self._line: int = pos[0]
         self._column: int = pos[1]
         self._parent: Optional['ASTNode'] = None
 
-    def __dir__(self):
+    def __dir__(self) -> List[str]:
         return list(k for k in self.__dict__.keys() if not k.startswith('_'))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         attr_value = []
         for attr in dir(self):
             value = getattr(self, attr)
@@ -36,27 +42,26 @@ class ASTNode:
         string = ', '.join(attr_value)
         return f'{self.__class__.__qualname__}({string})'
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[Tuple[str, str], None, None]:
         for attr in self.__dir__():
             yield attr, getattr(self, attr)
 
     @property
-    def parent(self):
+    def parent(self) -> Optional['ASTNode']:
         return self._parent
 
 
 class ASTVisitor:
-    def visit(self, node: ASTNode):
+    def visit(self, node: ASTNode) -> Any:
         method = 'visit_' + node.__class__.__name__
         visitor = getattr(self, method, self.generic_visit)
         return visitor(node)
 
-    def generic_visit(self, node: ASTNode):
+    def generic_visit(self, node: ASTNode) -> None:
         for field, value in node:
             if isinstance(value, list):
                 for item in value:
                     if isinstance(item, ASTNode):
-
                         self.visit(item)
             elif isinstance(value, ASTNode):
                 value._parent = node
@@ -64,7 +69,7 @@ class ASTVisitor:
 
 
 class ParentSetter:
-    def visit(self, node: ASTNode):
+    def visit(self, node: ASTNode) -> None:
         for field, value in node:
             if isinstance(value, list):
                 for item in value:
@@ -78,7 +83,7 @@ class ParentSetter:
 
 class NameGetter:
     @classmethod
-    def visit(cls, node: ASTNode):
+    def visit(cls, node: ASTNode) -> Set[str]:
         names = set()
         if isinstance(node, Name):
             names.add(node.name)
@@ -106,7 +111,7 @@ class Constraint(ASTNode):
 
 
 class Expression(ASTNode):
-    def __init__(self, pos: Tuple[int, int]):
+    def __init__(self, pos: Tuple[int, int]) -> None:
         super().__init__(pos)
         self._result_type: Optional[str] = None
 
@@ -115,25 +120,25 @@ class Expression(ASTNode):
         return self._result_type
 
     @result_type.setter
-    def result_type(self, value: str):
+    def result_type(self, value: str) -> None:
         self._result_type = value
 
 
 class Number(Expression):
-    def __init__(self, pos: Tuple[int, int], n: Union[int, float]):
+    def __init__(self, pos: Tuple[int, int], n: Union[int, float]) -> None:
         super().__init__(pos)
         self.n: Union[int, float] = n
 
 
 class Name(Expression):
-    def __init__(self, pos: Tuple[int, int], name: str, ctx: VarContext):
+    def __init__(self, pos: Tuple[int, int], name: str, ctx: VarContext) -> None:
         super().__init__(pos)
         self.name: str = name
         self.ctx: VarContext = ctx
 
 
 class Subscript(Expression):
-    def __init__(self, pos: Tuple[int, int], name: Name, indices: List[Name], ctx: VarContext):
+    def __init__(self, pos: Tuple[int, int], name: Name, indices: List[Name], ctx: VarContext) -> None:
         super().__init__(pos)
         self.name: Name = name
         self.indices: List[Name] = indices
@@ -141,7 +146,7 @@ class Subscript(Expression):
 
 
 class ParameterAnnotation(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, kind: str):
+    def __init__(self, pos: Tuple[int, int], name: Name, kind: str) -> None:
         super().__init__(pos)
         self.name: Name = name
         self.kind: str = kind
@@ -149,7 +154,7 @@ class ParameterAnnotation(Annotation):
 
 class ExprAnnotation(Annotation):
     def __init__(self, pos: Tuple[int, int], lhs: Union[Name, Subscript], rhs: Expression,
-                 constraints: Optional[Constraint]):
+                 constraints: Optional[Constraint]) -> None:
         super().__init__(pos)
         self.lhs: Union[Name, Subscript] = lhs
         self.rhs: Expression = rhs
@@ -157,7 +162,7 @@ class ExprAnnotation(Annotation):
 
 
 class ObjectAnnotation(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, kind: str, constraints: Constraint):
+    def __init__(self, pos: Tuple[int, int], name: Name, kind: str, constraints: Constraint) -> None:
         super().__init__(pos)
         self.name: Name = name
         self.kind: str = kind
@@ -169,7 +174,7 @@ class BinaryLogicalOp(Constraint):
         AND = 'And'
         OR = 'Or'
 
-    def __init__(self, pos: Tuple[int, int], lhs: Constraint, op: 'BinaryLogicalOp.Ops', rhs: Constraint):
+    def __init__(self, pos: Tuple[int, int], lhs: Constraint, op: 'BinaryLogicalOp.Ops', rhs: Constraint) -> None:
         super().__init__(pos)
         self.lhs: Constraint = lhs
         self.rhs: Constraint = rhs
@@ -180,7 +185,7 @@ class UnaryLogicalOp(Constraint):
     class Ops(Enum):
         NOT = 'Not'
 
-    def __init__(self, pos: Tuple[int, int], op: 'UnaryLogicalOp.Ops', constraint: Constraint):
+    def __init__(self, pos: Tuple[int, int], op: 'UnaryLogicalOp.Ops', constraint: Constraint) -> None:
         super().__init__(pos)
         self.op: UnaryLogicalOp.Ops = op
         self.constraint: Constraint = constraint
@@ -195,7 +200,7 @@ class RelOp(Constraint):
         EQ = '=='
         NEQ = '!='
 
-    def __init__(self, pos: Tuple[int, int], lhs: Expression, op: 'RelOp.Ops', rhs: Expression):
+    def __init__(self, pos: Tuple[int, int], lhs: Expression, op: 'RelOp.Ops', rhs: Expression) -> None:
         super().__init__(pos)
         self.lhs: Expression = lhs
         self.rhs: Expression = rhs
@@ -203,29 +208,26 @@ class RelOp(Constraint):
 
 
 class String(ASTNode):
-    def __init__(self, pos: Tuple[int, int], s: str):
+    def __init__(self, pos: Tuple[int, int], s: str) -> None:
         super().__init__(pos)
         self.s: str = s
 
 
-Arg = TypeVar('Arg', Number, Name, String)
-
-
 class Predicate(Constraint):
-    def __init__(self, pos: Tuple[int, int], name: str, args: List[Arg]):
+    def __init__(self, pos: Tuple[int, int], name: str, args: List[Union[Number, Name, String]]) -> None:
         super().__init__(pos)
         self.name: str = name
-        self.args: List[Arg] = args
+        self.args: List[Union[Number, Name, String]] = args
 
 
 class Method(ASTNode):
-    def __init__(self, pos, statements: List[Statement], annotations: List[Annotation]):
+    def __init__(self, pos: Tuple[int, int], statements: List[Statement], annotations: List[Annotation]) -> None:
         super().__init__(pos)
         self.statements: List[Statement] = statements
         self.annotations: List[Annotation] = annotations
         self.symbol_table = None
 
-    def print_ast(self):
+    def print_ast(self) -> None:
         for s in self.statements:
             print(s)
 
@@ -234,7 +236,7 @@ class Method(ASTNode):
 
 
 class Assign(Statement):
-    def __init__(self, pos: Tuple[int, int], lhs: Expression, rhs: Expression):
+    def __init__(self, pos: Tuple[int, int], lhs: Expression, rhs: Expression) -> None:
         super().__init__(pos)
         self.lhs: Expression = lhs
         self.rhs: Expression = rhs
@@ -248,7 +250,7 @@ class BinaryOp(Expression):
         DIV = '/'
         POW = '^'
 
-    def __init__(self, pos: Tuple[int, int], left: Expression, op: 'BinaryOp.Ops', right: Expression):
+    def __init__(self, pos: Tuple[int, int], left: Expression, op: 'BinaryOp.Ops', right: Expression) -> None:
         super().__init__(pos)
         self.left: Expression = left
         self.right: Expression = right
@@ -259,21 +261,22 @@ class UnaryOp(Expression):
     class Ops(Enum):
         NEG = '-'
 
-    def __init__(self, pos: Tuple[int, int], op: 'UnaryOp.Ops', expr: Expression):
+    def __init__(self, pos: Tuple[int, int], op: 'UnaryOp.Ops', expr: Expression) -> None:
         super().__init__(pos)
         self.op: UnaryOp.Ops = op
         self.expr: Expression = expr
 
 
 class Sum(Expression):
-    def __init__(self, pos: Tuple[int, int], name: Name, expr: Expression):
+    def __init__(self, pos: Tuple[int, int], name: Name, expr: Expression) -> None:
         super().__init__(pos)
         self.name: Name = name
         self.expr: Expression = expr
 
 
 class For(Statement):
-    def __init__(self, pos: Tuple[int, int], name: Name, value_from: Number, value_to: Number, body: List[Statement]):
+    def __init__(self, pos: Tuple[int, int], name: Name, value_from: Number, value_to: Number, body: List[Statement]) \
+            -> None:
         super().__init__(pos)
         self.name: Name = name
         self.value_from: Number = value_from
@@ -284,7 +287,7 @@ class For(Statement):
 
 class ForEach(Statement):
     def __init__(self, pos: Tuple[int, int], name: Name, kind: ObjectType, constraints: Constraint,
-                 body: List[Statement]):
+                 body: List[Statement]) -> None:
         super().__init__(pos)
         self.name: Name = name
         self.kind: ObjectType = kind
@@ -294,13 +297,13 @@ class ForEach(Statement):
 
 
 class Property(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, prop: String):
+    def __init__(self, pos: Tuple[int, int], name: Name, prop: String) -> None:
         super().__init__(pos)
         self.name: Name = name
         self.prop: String = prop
 
 
-def is_atom(node: ASTNode):
+def is_atom(node: ASTNode) -> bool:
     if isinstance(node, Subscript):
         return True
     if isinstance(node, Name):
