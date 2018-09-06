@@ -1,11 +1,7 @@
+"""CCL's abstract syntax tree elements"""
+
 from typing import List, Union, Tuple, Optional, Set, Generator, Any
 from enum import Enum
-
-
-__all__ = ['Annotation', 'Assign', 'ASTNode', 'ASTVisitor', 'BinaryLogicalOp', 'BinaryOp', 'Constraint',
-           'ExprAnnotation', 'Expression', 'For', 'ForEach', 'Method', 'Name', 'NameGetter', 'Number',
-           'ObjectAnnotation', 'ObjectType', 'ParameterAnnotation', 'ParentSetter', 'Predicate', 'Property', 'RelOp',
-           'Statement', 'String', 'Subscript', 'Sum', 'UnaryLogicalOp', 'UnaryOp', 'VarContext', 'is_atom']
 
 
 class VarContext(Enum):
@@ -19,16 +15,28 @@ class ObjectType(Enum):
     BOND = 'Bond'
 
 
+class NumericType(Enum):
+    INT = 'Int'
+    FLOAT = 'Float'
+
+
+class ParameterType(Enum):
+    ATOM = 'Atom'
+    BOND = 'Bond'
+    COMMON = 'Common'
+
+
 class ASTNode:
     _fields = ()
+    _internal = ('line', 'column', 'parent')
 
     def __init__(self, pos: Tuple[int, int]) -> None:
-        self._line: int = pos[0]
-        self._column: int = pos[1]
-        self._parent: Optional['ASTNode'] = None
+        self.line: int = pos[0]
+        self.column: int = pos[1]
+        self.parent: Optional['ASTNode'] = None
 
     def __dir__(self) -> List[str]:
-        return list(k for k in self.__dict__.keys() if not k.startswith('_'))
+        return list(k for k in self.__dict__ if k not in ASTNode._internal)
 
     def __repr__(self) -> str:
         attr_value = []
@@ -46,10 +54,6 @@ class ASTNode:
         for attr in self.__dir__():
             yield attr, getattr(self, attr)
 
-    @property
-    def parent(self) -> Optional['ASTNode']:
-        return self._parent
-
 
 class ASTVisitor:
     def visit(self, node: ASTNode) -> Any:
@@ -58,26 +62,25 @@ class ASTVisitor:
         return visitor(node)
 
     def generic_visit(self, node: ASTNode) -> None:
-        for field, value in node:
+        for _, value in node:
             if isinstance(value, list):
                 for item in value:
                     if isinstance(item, ASTNode):
                         self.visit(item)
             elif isinstance(value, ASTNode):
-                value._parent = node
                 self.visit(value)
 
 
 class ParentSetter:
     def visit(self, node: ASTNode) -> None:
-        for field, value in node:
+        for _, value in node:
             if isinstance(value, list):
                 for item in value:
                     if isinstance(item, ASTNode):
-                        item._parent = node
+                        item.parent = node
                         self.visit(item)
             elif isinstance(value, ASTNode):
-                value._parent = node
+                value.parent = node
                 self.visit(value)
 
 
@@ -87,7 +90,7 @@ class NameGetter:
         names = set()
         if isinstance(node, Name):
             names.add(node.name)
-        for field, value in node:
+        for _, value in node:
             if isinstance(value, list):
                 for item in value:
                     if isinstance(item, ASTNode):
@@ -113,14 +116,14 @@ class Constraint(ASTNode):
 class Expression(ASTNode):
     def __init__(self, pos: Tuple[int, int]) -> None:
         super().__init__(pos)
-        self._result_type: Optional[str] = None
+        self._result_type: Optional[Union[NumericType, ParameterType, ObjectType]] = None
 
     @property
-    def result_type(self):
+    def result_type(self) -> Union[NumericType, ParameterType, ObjectType]:
         return self._result_type
 
     @result_type.setter
-    def result_type(self, value: str) -> None:
+    def result_type(self, value: Union[NumericType, ParameterType, ObjectType]) -> None:
         self._result_type = value
 
 

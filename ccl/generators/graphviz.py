@@ -1,10 +1,11 @@
+"""Generate a graph representation of CCL's abstract syntax tree in dot format"""
+
 import itertools
 import html
 from typing import List
 from enum import Enum
 
-from ccl.ast import *
-
+import ccl.ast as ast
 
 __all__ = ['Graphviz']
 
@@ -20,7 +21,7 @@ class GraphNode:
         return f'node{self.idx} [label = < <b>{self.node_type}</b><br/> {property_string} >]'
 
 
-class Graphviz(ASTVisitor):
+class Graphviz(ast.ASTVisitor):
     def __init__(self) -> None:
         super().__init__()
         self.nodes: List[GraphNode] = []
@@ -29,7 +30,7 @@ class Graphviz(ASTVisitor):
         self.nodes.append(gn)
         self.current_node: GraphNode = gn
 
-    def _visit(self, field: str, node: ASTNode) -> None:
+    def _visit(self, field: str, node: ast.ASTNode) -> None:
         gn = GraphNode(len(self.nodes) + 1, node.__class__.__name__)
         self.nodes.append(gn)
         self.edges.append(f'node{self.current_node.idx} -> node{gn.idx} [label = "{field}"]')
@@ -38,13 +39,13 @@ class Graphviz(ASTVisitor):
         self.visit(node)
         self.current_node = old
 
-    def generic_visit(self, node: ASTNode) -> None:
+    def generic_visit(self, node: ast.ASTNode) -> None:
         for field, value in node:
             if isinstance(value, list):
                 for idx, item in enumerate(value):
-                    if isinstance(item, ASTNode):
+                    if isinstance(item, ast.ASTNode):
                         self._visit(f'{field}:{idx}', item)
-            elif isinstance(value, ASTNode):
+            elif isinstance(value, ast.ASTNode):
                 self._visit(field, value)
             else:
                 if isinstance(value, Enum):
@@ -52,7 +53,7 @@ class Graphviz(ASTVisitor):
                 else:
                     self.current_node.properties.append(f'{field} = {value}')
 
-    def visit_Method(self, node: Method) -> str:
+    def visit_Method(self, node: ast.Method) -> str:
         self.generic_visit(node)
 
         data = ''

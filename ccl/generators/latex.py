@@ -1,9 +1,11 @@
+"""Generate LaTeX representation of a method written in CCL"""
+
 from typing import Union
 
-from ccl.symboltable import *
-from ccl.ast import *
+import ccl.ast as ast
+import ccl.symboltable as symboltable
 
-greek_letters = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu',
+GREEK_LETTERS = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu',
                  'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon', 'Phi', 'Chi', 'Psi', 'Omega']
 
 
@@ -11,31 +13,34 @@ __all__ = ['Latex']
 
 
 def get_name(name: str) -> str:
-    if name in greek_letters or name.capitalize() in greek_letters:
-        return f'\{name}'
-    else:
-        return name
+    if name in GREEK_LETTERS or name.capitalize() in GREEK_LETTERS:
+        return f'\\{name}'
+
+    return name
 
 
 # noinspection PyPep8Naming
-class Latex(ASTVisitor):
-    def __init__(self, symbol_table: SymbolTable) -> None:
+class Latex(ast.ASTVisitor):
+    def __init__(self, symbol_table: symboltable.SymbolTable) -> None:
         super().__init__()
-        self.depth = 0
-        self.symbol_table: SymbolTable = symbol_table
-        self.inside_math = True
+        self.depth: int = 0
+        self.symbol_table: symboltable.SymbolTable = symbol_table
+        self.inside_math: bool = True
 
-    def visit_Name(self, node: Name) -> str:
+    def visit(self, node: ast.ASTNode) -> str:  # Just to make mypy happy
+        return str(super().visit(node))
+
+    def visit_Name(self, node: ast.Name) -> str:
         plain_name = get_name(node.name)
         if self.inside_math:
             return plain_name
-        else:
-            return f'${plain_name}$'
 
-    def visit_Number(self, node: Number) -> Union[int, float]:
+        return f'${plain_name}$'
+
+    def visit_Number(self, node: ast.Number) -> Union[int, float]:
         return node.n
 
-    def visit_For(self, node: For) -> str:
+    def visit_For(self, node: ast.For) -> str:
         name_str = self.visit(node.name)
         value_from = self.visit(node.value_from)
         value_to = self.visit(node.value_to)
@@ -46,9 +51,9 @@ class Latex(ASTVisitor):
         else:
             body = '\\\\' + '\\\\\n'.join(f'\\hspace*{{{4 * self.depth}mm}} {s}' for s in body_str)
         self.depth -= 1
-        return f'\\text{{for }} {value_from} \leq {name_str} \leq {value_to}:\n{body}'
+        return f'\\text{{for }} {value_from} \\leq {name_str} \\leq {value_to}:\n{body}'
 
-    def visit_ForEach(self, node: ForEach) -> str:
+    def visit_ForEach(self, node: ast.ForEach) -> str:
         name_str = self.visit(node.name)
         kind = node.kind.value.lower()
         self.depth += 1
@@ -60,46 +65,46 @@ class Latex(ASTVisitor):
         self.depth -= 1
         return f'\\forall \\text{{ {kind} }} {name_str}: {body}'
 
-    def visit_Assign(self, node: Assign) -> str:
+    def visit_Assign(self, node: ast.Assign) -> str:
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
 
         return f'{lhs} = {rhs}'
 
-    def visit_BinaryOp(self, node: BinaryOp) -> str:
+    def visit_BinaryOp(self, node: ast.BinaryOp) -> str:
         left = self.visit(node.left)
         right = self.visit(node.right)
 
-        if node.op == BinaryOp.Ops.MUL:
-            if not is_atom(node.left) and not (isinstance(node.left, BinaryOp) and node.left.op == BinaryOp.Ops.POW):
+        if node.op == ast.BinaryOp.Ops.MUL:
+            if not ast.is_atom(node.left) and not (isinstance(node.left, ast.BinaryOp) and node.left.op == ast.BinaryOp.Ops.POW):
                 left = f'\\left({left}\\right)'
-            if not is_atom(node.right) and not (isinstance(node.right, BinaryOp) and node.right.op == BinaryOp.Ops.POW):
+            if not ast.is_atom(node.right) and not (isinstance(node.right, ast.BinaryOp) and node.right.op == ast.BinaryOp.Ops.POW):
                 right = f'\\left({right}\\right)'
             op = ''
-        elif node.op == BinaryOp.Ops.DIV:
+        elif node.op == ast.BinaryOp.Ops.DIV:
             return f'\\frac{{{left}}}{{{right}}}'
-        elif node.op == BinaryOp.Ops.POW:
-            if is_atom(node.left):
+        elif node.op == ast.BinaryOp.Ops.POW:
+            if ast.is_atom(node.left):
                 return f'{{{left}}} ^ {{{right}}}'
-            else:
-                return f'\\left({left}\\right)^{right}'
+
+            return f'\\left({left}\\right)^{right}'
         else:
             op = node.op.value
 
         return f'{left} {op} {right}'
 
-    def visit_Sum(self, node: Sum) -> str:
+    def visit_Sum(self, node: ast.Sum) -> str:
         name = self.visit(node.name)
         expr = self.visit(node.expr)
 
-        return f'\sum_{{{name}}}\\left({expr}\\right)'
+        return f'\\sum_{{{name}}}\\left({expr}\\right)'
 
-    def visit_Subscript(self, node: Subscript) -> str:
+    def visit_Subscript(self, node: ast.Subscript) -> str:
         name = self.visit(node.name)
         indices = ', '.join(self.visit(idx) for idx in node.indices)
         return f'{name}_{{{indices}}}'
 
-    def visit_Method(self, node: Method) -> str:
+    def visit_Method(self, node: ast.Method) -> str:
         statements = ''
         for s in node.statements:
             statements += f'{self.visit(s)}\n'
@@ -108,13 +113,13 @@ class Latex(ASTVisitor):
         annotations = self.visit_SymbolTable()
         return f'\\noindent ${statements}$\n\n\\vspace*{{5mm}}\\noindent where\n\n\\noindent {annotations}'
 
-    def visit_BinaryLogicalOp(self, node: BinaryLogicalOp) -> str:
+    def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:
         left = self.visit(node.lhs)
         right = self.visit(node.rhs)
 
         return f'{left} {node.op.value.lower()} {right}'
 
-    def visit_RelOp(self, node: RelOp) -> str:
+    def visit_RelOp(self, node: ast.RelOp) -> str:
         self.inside_math = True
         left = self.visit(node.lhs)
         right = self.visit(node.rhs)
@@ -122,29 +127,29 @@ class Latex(ASTVisitor):
 
         return f'${left} {node.op.value} {right}$'
 
-    def visit_UnaryOp(self, node: UnaryOp) -> str:
-        op = UnaryOp.Ops(node.op).value
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> str:
+        op = ast.UnaryOp.Ops(node.op).value
         return f'{op}' + self.visit(node.expr)
 
-    def visit_UnaryLogicalOp(self, node: UnaryLogicalOp) -> str:
-        op = UnaryLogicalOp.Ops(node.op).value
+    def visit_UnaryLogicalOp(self, node: ast.UnaryLogicalOp) -> str:
+        op = ast.UnaryLogicalOp.Ops(node.op).value
         return f'{op.lower()} ' + self.visit(node.constraint)
 
-    def visit_String(self, node: String) -> str:
+    def visit_String(self, node: ast.String) -> str:
         return f'\\text{{{node.s}}}'
 
-    def visit_Predicate(self, node: Predicate) -> str:
+    def visit_Predicate(self, node: ast.Predicate) -> str:
         if node.name == 'bonded':
             a1 = self.visit(node.args[0])
             a2 = self.visit(node.args[1])
             return f'{a1}\\text{{ is bonded to }}{a2}'
-        elif node.name == 'element':
+        if node.name == 'element':
             a = self.visit(node.args[0])
             s = self.visit(node.args[1])
             return f'{a}\\text{{ is {s}}}'
-        else:
-            args = ', '.join(self.visit(arg) for arg in node.args)
-            return f'\\text{{{node.name}}}({args})'
+
+        args = ', '.join(self.visit(arg) for arg in node.args)
+        return f'\\text{{{node.name}}}({args})'
 
     def visit_SymbolTable(self) -> str:
         atom_parameters = []
@@ -154,50 +159,51 @@ class Latex(ASTVisitor):
         atoms = []
         bonds = []
         functions = []
-        for s in self.symbol_table.symbols.values():
-            if isinstance(s, ParameterSymbol):
-                if s.kind == ParameterType.ATOM:
-                    atom_parameters.append(s)
-                elif s.kind == ParameterType.BOND:
-                    bond_parameters.append(s)
+        for symbol in self.symbol_table.symbols.values():
+            if isinstance(symbol, symboltable.ParameterSymbol):
+                if symbol.kind == ast.ParameterType.ATOM:
+                    atom_parameters.append(symbol)
+                elif symbol.kind == ast.ParameterType.BOND:
+                    bond_parameters.append(symbol)
                 else:
-                    common_parameters.append(s)
-            elif isinstance(s, ObjectSymbol):
-                if s.kind == ObjectType.ATOM:
-                    atoms.append(s)
+                    common_parameters.append(symbol)
+            elif isinstance(symbol, symboltable.ObjectSymbol):
+                if symbol.kind == ast.ObjectType.ATOM:
+                    atoms.append(symbol)
                 else:
-                    bonds.append(s)
-            elif isinstance(s, ExprSymbol):
-                expressions.append(s)
-            elif isinstance(s, VariableSymbol):
+                    bonds.append(symbol)
+            elif isinstance(symbol, symboltable.ExprSymbol):
+                expressions.append(symbol)
+            elif isinstance(symbol, symboltable.VariableSymbol):
                 pass  # We need only vector q
-            elif isinstance(s, FunctionSymbol):
-                functions.append(s)
+            elif isinstance(symbol, symboltable.FunctionSymbol):
+                functions.append(symbol)
             else:
-                raise RuntimeError(f'No suitable symbol type for {s}')
+                raise RuntimeError(f'No suitable symbol type for {symbol}')
 
         expressions_string = []
         strings = []
         if expressions:
             self.inside_math = True
-            for s in expressions:
-                if len(s.rules) == 1:
-                    if s.indices:
-                        indices = '_{' + ', '.join(idx for idx in s.indices) + '}'
+            for symbol in expressions:
+                if len(symbol.rules) == 1:
+                    if symbol.indices:
+                        indices = '_{' + ', '.join(idx for idx in symbol.indices) + '}'
                     else:
                         indices = ''
-                    expressions_string.append(f'${get_name(s.name)}{indices} = {self.visit(s.rules[None])}$\\\\')
+                    expressions_string.append(f'${get_name(symbol.name)}{indices} = '
+                                              f'{self.visit(symbol.rules[None])}$\\\\')
                 else:
                     rules = ''
-                    for constraint, value in s.rules.items():
+                    for constraint, value in symbol.rules.items():
                         if constraint:
                             c = '\\text{if }' + self.visit(constraint) + '\\\\'
                         else:
                             c = '\\text{otherwise}\\\\'
-                        value = self.visit(value)
-                        rules += f'{value} & {c}\n'
-                    indices = '_{' + ', '.join(idx for idx in s.indices) + '}'
-                    expressions_string.append(f'${get_name(s.name)}{indices} = \n\\begin{{cases}}\n'
+                        value_str = self.visit(value)
+                        rules += f'{value_str} & {c}\n'
+                    indices = '_{' + ', '.join(idx for idx in symbol.indices) + '}'
+                    expressions_string.append(f'${get_name(symbol.name)}{indices} = \n\\begin{{cases}}\n'
                                               f'{rules}\\end{{cases}}$')
             self.inside_math = False
         if expressions_string:
@@ -205,11 +211,11 @@ class Latex(ASTVisitor):
         else:
             strings.append('$q$ is a vector of charges')
         if functions:
-            for s in functions:
-                if s.function.name == 'distance':
-                    strings.append(f'${get_name(s.name)}_{{i, j}}$ is a distance between atoms $i$ and $j$')
+            for symbol in functions:
+                if symbol.function.name == 'distance':
+                    strings.append(f'${get_name(symbol.name)}_{{i, j}}$ is a distance between atoms $i$ and $j$')
                 else:
-                    strings.append(f'${get_name(s.name)}$ is {s.function.comment}')
+                    strings.append(f'${get_name(symbol.name)}$ is {symbol.function.comment}')
         if atom_parameters:
             if len(atom_parameters) == 1:
                 strings.append(f'${get_name(atom_parameters[0].name)}$ is an atom parameter')
@@ -232,18 +238,18 @@ class Latex(ASTVisitor):
                 strings.append(f'{names} are common parameters')
 
         if atoms:
-            for s in atoms:
-                tmp = f'${get_name(s.name)}$ is an atom'
-                if s.constraints:
-                    tmp += ' such that ' + self.visit(s.constraints)
+            for symbol in atoms:
+                tmp = f'${get_name(symbol.name)}$ is an atom'
+                if symbol.constraints:
+                    tmp += ' such that ' + self.visit(symbol.constraints)
 
                 strings.append(tmp)
 
         if bonds:
-            for s in bonds:
-                tmp = f'${get_name(s.name)}$ is a bond'
-                if s.constraints:
-                    tmp += ' such that ' + self.visit(s.constraints)
+            for symbol in bonds:
+                tmp = f'${get_name(symbol.name)}$ is a bond'
+                if symbol.constraints:
+                    tmp += ' such that ' + self.visit(symbol.constraints)
 
                 strings.append(tmp)
 

@@ -1,7 +1,9 @@
-from typing import List, Union
+"""Translate method in CCL to Python"""
 
-from ccl.symboltable import *
-from ccl.ast import *
+from typing import List, Union, Tuple, Optional
+
+import ccl.ast as ast
+import ccl.symboltable as symboltable
 
 __all__ = ['Python']
 
@@ -31,25 +33,25 @@ class ChargeMethod(ChargeCalculationMethod):
 
 
 # noinspection PyPep8Naming
-class Python(ASTVisitor):
-    def __init__(self, symbol_table: SymbolTable) -> None:
+class Python(ast.ASTVisitor):
+    def __init__(self, symbol_table: symboltable.SymbolTable) -> None:
         super().__init__()
-        self.symbol_table: SymbolTable = symbol_table
+        self.symbol_table: symboltable.SymbolTable = symbol_table
         self.definitions: List[str] = []
         self.depth: int = 2
         self.sum_count: int = 0
-        self.resolving_node: Optional[ASTNode] = None
+        self.resolving_node: Optional[ast.ASTNode] = None
 
     def p(self, string: str) -> str:
         return ' ' * self.depth * 4 + string
 
-    def define_new_symbols(self, symbol_table: SymbolTable) -> str:
+    def define_new_symbols(self, symbol_table: symboltable.SymbolTable) -> str:
         code = []
         for symbol in symbol_table.symbols.values():
-            if isinstance(symbol, VariableSymbol) and symbol.types:
+            if isinstance(symbol, symboltable.VariableSymbol) and symbol.types:
                 sizes = []
                 for t in symbol.types:
-                    if t == ObjectType.ATOM:
+                    if t == ast.ObjectType.ATOM:
                         sizes.append('n')
                     else:
                         sizes.append('len(molecule.bonds)')
@@ -63,14 +65,14 @@ class Python(ASTVisitor):
         atom_parameters = []
         bond_parameters = []
         common_parameters = []
-        for s in self.symbol_table.symbols.values():
-            if isinstance(s, ParameterSymbol):
-                if s.kind == ParameterType.ATOM:
-                    atom_parameters.append(s.name)
-                elif s.kind == ParameterType.BOND:
-                    bond_parameters.append(s.name)
+        for symbol in self.symbol_table.symbols.values():
+            if isinstance(symbol, symboltable.ParameterSymbol):
+                if symbol.kind == ast.ParameterType.ATOM:
+                    atom_parameters.append(symbol.name)
+                elif symbol.kind == ast.ParameterType.BOND:
+                    bond_parameters.append(symbol.name)
                 else:
-                    common_parameters.append(s.name)
+                    common_parameters.append(symbol.name)
 
         atom_parameters_str = ', '.join(f'\'{s}\'' for s in atom_parameters)
         bond_parameters_str = ', '.join(f'\'{s}\'' for s in bond_parameters)
@@ -82,15 +84,16 @@ class Python(ASTVisitor):
 def {name}(self, {args}):
 {code}
 '''
-        for s in self.symbol_table.symbols.values():
-            if isinstance(s, ExprSymbol):
-                if len(s.rules) == 1:
-                    code = f'    return {self.visit(s.rules[None])}'
-                    indices = ', '.join(s.indices) if s.indices else ''
-                    self.definitions.append(template.format(name=s.name, args=indices, code=code))
+        for symbol in self.symbol_table.symbols.values():
+            if isinstance(symbol, symboltable.ExprSymbol):
+                if len(symbol.rules) == 1:
+                    res = self.visit(symbol.rules[None])
+                    code = f'    return {res}'
+                    indices = ', '.join(symbol.indices) if symbol.indices else ''
+                    self.definitions.append(template.format(name=symbol.name, args=indices, code=code))
                 else:
                     code = ''
-                    for constraint, value in s.rules.items():
+                    for constraint, value in symbol.rules.items():
                         expr = self.visit(value)
                         if constraint is not None:
                             cond = self.visit(constraint)
@@ -98,141 +101,141 @@ def {name}(self, {args}):
                             code += f'        return {expr}\n'
                         else:
                             code += f'    return {expr}'
-                    indices = ', '.join(s.indices)
-                    self.definitions.append(template.format(name=s.name, args=indices, code=code))
+                    indices = ', '.join(symbol.indices)
+                    self.definitions.append(template.format(name=symbol.name, args=indices, code=code))
 
-    def visit_Method(self, node: Method) -> str:
+    def visit_Method(self, node: ast.Method) -> str:
         code_lines = []
         self.process_expressions()
         for statement in node.statements:
-            code_lines.append(self.visit(statement))
+            code_lines.append(str(self.visit(statement)))
         code = '\n'.join(code_lines)
         defs = '\n'.join(f'    {line}' for d in self.definitions for line in d.split('\n'))
         atom_parameters, bond_parameters, common_parameters = self.get_parameters()
         return python_template.format(defs=defs, code=code, atom_parameters=atom_parameters,
                                       bond_parameters=bond_parameters, common_parameters=common_parameters)
 
-    def visit_Assign(self, node: Assign) -> str:
+    def visit_Assign(self, node: ast.Assign) -> str:
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
 
         return self.p(f'{lhs} = {rhs}')
 
-    def visit_Number(self, node: Number) -> Union[int, float]:
+    def visit_Number(self, node: ast.Number) -> Union[int, float]:
         return node.n
 
-    def visit_Name(self, node: Name) -> str:
-        symbol = SymbolTable.get_table(node).resolve(node.name)
-        if isinstance(symbol, ExprSymbol):
+    def visit_Name(self, node: ast.Name) -> str:
+        symbol = symboltable.SymbolTable.get_table(node).resolve(node.name)
+        if isinstance(symbol, symboltable.ExprSymbol):
             return f'self.{node.name}()'
-        else:
-            return node.name
 
-    def visit_Subscript(self, node: Subscript) -> str:
+        return node.name
+
+    def visit_Subscript(self, node: ast.Subscript) -> str:
         if self.resolving_node is not None:
-            symbol = SymbolTable.get_table(self.resolving_node).resolve(node.name.name)
+            symbol = symboltable.SymbolTable.get_table(self.resolving_node).resolve(node.name.name)
         else:
-            symbol = SymbolTable.get_table(node).resolve(node.name.name)
-        if isinstance(symbol, VariableSymbol):
+            symbol = symboltable.SymbolTable.get_table(node).resolve(node.name.name)
+        if isinstance(symbol, symboltable.VariableSymbol):
             name = 'charges' if symbol.name == 'q' else symbol.name
             indices = ', '.join(f'{self.visit(idx)}.index' for idx in node.indices)
             return f'{name}[{indices}]'
-        elif isinstance(symbol, ParameterSymbol) and symbol.kind == ParameterType.ATOM:
-                return f'self.parameters.atom[\'{symbol.name}\']({node.indices[0].name})'
-        elif isinstance(symbol, ParameterSymbol) and symbol.kind == ParameterType.BOND:
-                if len(node.indices) == 1:
-                    return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].name})'
-                else:
-                    return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].name}, {node.indices[1].name})'
-        elif isinstance(symbol, ExprSymbol):
+        if isinstance(symbol, symboltable.ParameterSymbol) and symbol.kind == ast.ParameterType.ATOM:
+            return f'self.parameters.atom[\'{symbol.name}\']({node.indices[0].name})'
+        if isinstance(symbol, symboltable.ParameterSymbol) and symbol.kind == ast.ParameterType.BOND:
+            if len(node.indices) == 1:
+                return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].name})'
+
+            return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].name}, {node.indices[1].name})'
+        if isinstance(symbol, symboltable.ExprSymbol):
             indices = ', '.join(f'{self.visit(idx)}' for idx in node.indices)
             return f'self.{symbol.name}({indices})'
-        elif isinstance(symbol, FunctionSymbol):
+        if isinstance(symbol, symboltable.FunctionSymbol):
             if symbol.function.name == 'distance':
                 indices = ', '.join(f'{self.visit(idx)}' for idx in node.indices)
                 return f'geometry.distance({indices})'
-            elif symbol.function.name == 'vdw_radius':
+            if symbol.function.name == 'vdw_radius':
                 name = self.visit(node.indices[0])
                 return f'{name}.element.vdw_radius'
-            else:
-                raise NotImplemented(f'Can\' translate function {symbol.function.name}')
-        else:
-            raise NotImplemented(f'Unknown symbol type {symbol}')
 
-    def visit_UnaryOp(self, node: UnaryOp) -> str:
-        return f'{node.op.value}' + self.visit(node.expr)
+            raise NotImplementedError(f'Can\' translate function {symbol.function.name}')
 
-    def visit_BinaryOp(self, node: BinaryOp) -> str:
+        raise NotImplementedError(f'Unknown symbol type {symbol}')
+
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> str:
+        return f'{node.op.value}' + str(self.visit(node.expr))
+
+    def visit_BinaryOp(self, node: ast.BinaryOp) -> str:
         left = self.visit(node.left)
         right = self.visit(node.right)
-        if not is_atom(node.left):
+        if not ast.is_atom(node.left):
             left = f'({left})'
-        if not is_atom(node.right):
+        if not ast.is_atom(node.right):
             right = f'({right})'
-        if node.op == BinaryOp.Ops.POW:
+        if node.op == ast.BinaryOp.Ops.POW:
             op = '**'
         else:
             op = node.op.value
 
         return f'{left} {op} {right}'
 
-    def visit_For(self, node: For) -> str:
-        value_from = self.visit(node.value_from)
-        value_to = self.visit(node.value_to)
+    def visit_For(self, node: ast.For) -> str:
+        value_from = self.visit_Number(node.value_from)
+        value_to = self.visit_Number(node.value_to)
         name = self.visit(node.name)
         self.depth += 1
         statements = []
         for statement in node.body:
-            statements.append(self.visit(statement))
+            statements.append(str(self.visit(statement)))
 
         code = '\n'.join(statements)
         defines = self.define_new_symbols(node.symbol_table)
         self.depth -= 1
         return self.p(f'for {name} in range({value_from}, {value_to + 1}):\n{defines}{code}')
 
-    def visit_ForEach(self, node: ForEach) -> str:
+    def visit_ForEach(self, node: ast.ForEach) -> str:
         self.depth += 1
         statements = []
         name = self.visit(node.name)
         for statement in node.body:
-            statements.append(self.visit(statement))
+            statements.append(str(self.visit(statement)))
 
         code = '\n'.join(statements)
         defines = self.define_new_symbols(node.symbol_table)
         self.depth -= 1
-        kind = ObjectType(node.kind).value.lower()
+        kind = ast.ObjectType(node.kind).value.lower()
         return self.p(f'for {name} in molecule.{kind}s:\n{defines}{code}')
 
-    def visit_BinaryLogicalOp(self, node: BinaryLogicalOp) -> str:
+    def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
         op = node.op.value.lower()
         return f'{lhs} {op} {rhs}'
 
-    def visit_UnaryLogicalOp(self, node: UnaryLogicalOp) -> str:
+    def visit_UnaryLogicalOp(self, node: ast.UnaryLogicalOp) -> str:
         expr = self.visit(node.constraint)
         return f'{node.op.value.lower()} {expr}'
 
-    def visit_RelOp(self, node: RelOp) -> str:
+    def visit_RelOp(self, node: ast.RelOp) -> str:
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
         op = node.op.value
         return f'{lhs} {op} {rhs}'
 
-    def visit_String(self, node: String) -> str:
+    def visit_String(self, node: ast.String) -> str:
         return f'\'{node.s}\''
 
-    def visit_Predicate(self, node: Predicate) -> str:
-        arg_list = [self.visit(arg) for arg in node.args]
+    def visit_Predicate(self, node: ast.Predicate) -> str:
+        arg_list = [str(self.visit(arg)) for arg in node.args]
         args = ', '.join(arg_list)
         if node.name == 'bonded':
             return f'molecule.graph.bonded({args})'
-        elif node.name == 'element':
+        if node.name == 'element':
             return f'{arg_list[0]}.element.name.lower() == {arg_list[1]}.lower()'
-        else:
-            return f'{node.name}({args})'
 
-    def visit_Sum(self, node: Sum) -> str:
+        return f'{node.name}({args})'
+
+    def visit_Sum(self, node: ast.Sum) -> str:
         template = '''\
 def {name}(self, {args}):
     total = 0
@@ -243,10 +246,10 @@ def {name}(self, {args}):
     return total    
 '''
         fname = f'sum_{self.sum_count}'
-        obj = self.visit(node.name)
+        obj = self.visit_Name(node.name)
         self.sum_count += 1
         expr = self.visit(node.expr)
-        names = NameGetter.visit(node.expr) - {obj}
+        names = ast.NameGetter.visit(node.expr) - {obj}
         needed_names = []
         for name in names:
             if self.symbol_table.resolve(name) is None:
@@ -257,7 +260,7 @@ def {name}(self, {args}):
         old = self.resolving_node
         self.resolving_node = node
         if symbol.constraints is not None:
-            cond = ' if ' + self.visit(symbol.constraints)
+            cond = ' if ' + str(self.visit(symbol.constraints))
         else:
             cond = ''
         self.resolving_node = old
