@@ -6,6 +6,10 @@ from ccl.ast import ASTNode
 
 
 class CCLError(Exception):
+    pass
+
+
+class CCLCodeError(CCLError):
     def __init__(self, node: Optional[ASTNode], message: str) -> None:
         super().__init__()
         if node is not None:
@@ -17,13 +21,13 @@ class CCLError(Exception):
         self.message: str = message
 
 
-class CCLSyntaxError(CCLError):
+class CCLSyntaxError(CCLCodeError):
     pass
 
 
-class CCLSymbolError(CCLError):
+class CCLSymbolError(CCLCodeError):
     pass
 
 
-class CCLTypeError(CCLError):
+class CCLTypeError(CCLCodeError):
     pass

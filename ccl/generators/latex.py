@@ -2,8 +2,8 @@
 
 from typing import Union
 
-import ccl.ast as ast
-import ccl.symboltable as symboltable
+from ccl import ast, symboltable
+
 
 GREEK_LETTERS = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu',
                  'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon', 'Phi', 'Chi', 'Psi', 'Omega']

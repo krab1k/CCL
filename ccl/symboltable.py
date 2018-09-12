@@ -2,7 +2,7 @@
 
 from typing import Dict, Set, Tuple, Optional, Union
 
-import ccl.ast as ast
+from ccl import ast
 from ccl.errors import CCLSymbolError, CCLTypeError
 
 

@@ -2,8 +2,7 @@
 
 from typing import List, Union, Tuple, Optional
 
-import ccl.ast as ast
-import ccl.symboltable as symboltable
+from ccl import ast, symboltable
 
 __all__ = ['Python']
 

@@ -5,7 +5,7 @@ import html
 from typing import List
 from enum import Enum
 
-import ccl.ast as ast
+from ccl import ast, symboltable
 
 __all__ = ['Graphviz']
 
@@ -22,13 +22,14 @@ class GraphNode:
 
 
 class Graphviz(ast.ASTVisitor):
-    def __init__(self) -> None:
+    def __init__(self, table: symboltable.SymbolTable) -> None:
         super().__init__()
         self.nodes: List[GraphNode] = []
         self.edges: List[str] = []
         gn = GraphNode(0, 'Method')
         self.nodes.append(gn)
         self.current_node: GraphNode = gn
+        self.symboltable: symboltable.SymbolTable = table  # Currently not used
 
     def _visit(self, field: str, node: ast.ASTNode) -> None:
         gn = GraphNode(len(self.nodes) + 1, node.__class__.__name__)
