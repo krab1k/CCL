@@ -25,7 +25,7 @@ class Symbol:
         self.def_node: Optional[ast.ASTNode] = def_node
 
     @property
-    def symbol_type(self) -> Union[ast.ParameterType, ast.ObjectType, ast.NumericType]:
+    def symbol_type(self) -> Union[ast.ParameterType, ast.ObjectType, ast.NumericType, ast.ComplexType]:
         raise NotImplementedError('We should not get here!')
 
 
@@ -65,8 +65,8 @@ class FunctionSymbol(Symbol):
         self.function: Function = fn
 
     @property
-    def symbol_type(self) -> ast.NumericType:
-        return self.function.result_type
+    def symbol_type(self) -> ast.ComplexType:
+        return ast.ComplexType.FUNCTION
 
 
 class ExprSymbol(Symbol):
@@ -311,7 +311,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 raise CCLTypeError(node,
                                    f'Cannot index {node.name.name} with {index_types}, expected was'
                                    f'{symbol.function.arg_types}')
-            node.result_type = symbol.symbol_type
+            node.result_type = symbol.function.result_type
         elif isinstance(symbol, ExprSymbol):
             types = set()
             for expr in symbol.rules.values():

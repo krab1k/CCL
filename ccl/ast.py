@@ -26,6 +26,11 @@ class ParameterType(Enum):
     COMMON = 'Common'
 
 
+class ComplexType(Enum):
+    ARRAY = 'Array'
+    FUNCTION = 'Function'
+
+
 class ASTNode:
     _fields = ()
     _internal = ('line', 'column', 'parent')

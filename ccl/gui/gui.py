@@ -1,3 +1,5 @@
+"""Simple editor for CCL"""
+
 import sys
 import importlib
 from typing import Optional
@@ -33,6 +35,7 @@ class Editor(QWidget):
 
             except CCLCodeError as e:
                 self.status.setText(f'{e.line}: {e.message}')
+                self.code.setPlainText('')
             except NotImplementedError as e:
                 self.status.setText(str(e))
         else:
