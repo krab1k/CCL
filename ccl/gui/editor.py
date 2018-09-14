@@ -4,7 +4,7 @@ import sys
 import importlib
 from typing import Optional
 from PyQt5.QtWidgets import QApplication, QWidget, QPlainTextEdit, QVBoxLayout, QAction, QLabel, QComboBox
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QTextCursor, QTextBlockFormat, QColor
 
 import ccl.generators
 from ccl import translate
@@ -24,8 +24,25 @@ class Editor(QWidget):
         self.code_highlight: Optional[SyntaxHighlighter] = None
         self.initUI()
 
+    def highlight_error(self, line: int) -> None:
+        block = self.editor.document().findBlockByLineNumber(line - 1)
+        cursor = QTextCursor(block)
+        fmt = QTextBlockFormat()
+        fmt.setBackground(QColor(255, 220, 190))
+        cursor.setBlockFormat(fmt)
+
+    def clear_highlight(self) -> None:
+        fmt = QTextBlockFormat()
+        fmt.setBackground(QColor('white'))
+        block = self.editor.document().firstBlock()
+        while block.isValid():
+            cursor = QTextCursor(block)
+            cursor.setBlockFormat(fmt)
+            block = block.next()
+
     def ccl_changed(self) -> None:
         self.editor.blockSignals(True)
+        self.clear_highlight()
         data = self.editor.toPlainText()
         if data:
             try:
@@ -36,6 +53,7 @@ class Editor(QWidget):
             except CCLCodeError as e:
                 self.status.setText(f'{e.line}: {e.message}')
                 self.code.setPlainText('')
+                self.highlight_error(e.line)
             except NotImplementedError as e:
                 self.status.setText(str(e))
         else:
