@@ -263,7 +263,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
                         self.inside_constraint = False
                 node.result_type = symbol.symbol_type
             elif isinstance(symbol, ExprSymbol):
-                pass
+                self.visit(symbol.rules[None])
+                node.result_type = symbol.rules[None].result_type
             else:
                 node.result_type = symbol.symbol_type
         if node.ctx == ast.VarContext.LOAD and symbol is None:
