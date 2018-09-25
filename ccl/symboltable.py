@@ -125,6 +125,19 @@ class SymbolTable:
 
         self.symbols[symbol.name] = symbol
 
+    def get_table(self, s: str) -> Optional['SymbolTable']:
+        if s in self.symbols:
+            return self
+
+        if self.parent != self:
+            return self.parent.get_table(s)
+
+        return None
+
+    def is_global(self, s: str) -> bool:
+        table = self.get_table(s)
+        return table.parent == table
+
     def define_expr(self, symbol: ExprSymbol, constraint: Optional[ast.Constraint], value: ast.Expression) -> None:
         resolved_symbol = self.resolve(symbol.name)
         if resolved_symbol is None:
@@ -160,11 +173,11 @@ class SymbolTable:
         return table
 
     @classmethod
-    def get_table(cls, node: ast.ASTNode) -> 'SymbolTable':
+    def get_table_for_node(cls, node: ast.ASTNode) -> 'SymbolTable':
         if hasattr(node, 'symbol_table'):
             return node.symbol_table
 
-        return cls.get_table(node.parent)
+        return cls.get_table_for_node(node.parent)
 
     def print(self) -> None:
         for symbol in self.symbols.values():
@@ -181,7 +194,8 @@ class SymbolTable:
 class SymbolTableBuilder(ast.ASTVisitor):
     def __init__(self) -> None:
         super().__init__()
-        self.symbol_table: SymbolTable = SymbolTable(None)
+        self.global_table: SymbolTable = SymbolTable(None)
+        self.symbol_table: SymbolTable = SymbolTable(self.global_table)
         self.current_table: SymbolTable = self.symbol_table
 
         self._iterating_over: Set[str] = set()
@@ -189,15 +203,15 @@ class SymbolTableBuilder(ast.ASTVisitor):
         self.inside_constraint: bool = False
 
         # Define common symbols
-        self.current_table.define(VariableSymbol('q', None, ast.NumericType.FLOAT, (ast.ObjectType.ATOM,)))
-        self.current_table.define(FunctionSymbol('R', None, FUNCTIONS['distance']))
+        self.global_table.define(VariableSymbol('q', None, ast.NumericType.FLOAT, (ast.ObjectType.ATOM,)))
+        self.global_table.define(FunctionSymbol('R', None, FUNCTIONS['distance']))
 
     @property
     def iterating_over(self) -> set:
         return {self.indices_mapping.get(key, key) for key in self._iterating_over}
 
     def visit_Method(self, node: ast.Method) -> None:
-        node.symbol_table = self.symbol_table
+        node.symbol_table = self.current_table
         for a in node.annotations:
             self.visit(a)
 

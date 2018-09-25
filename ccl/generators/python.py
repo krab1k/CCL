@@ -86,13 +86,31 @@ def {name}(self, {args}):
         for symbol in self.symbol_table.symbols.values():
             if isinstance(symbol, symboltable.ExprSymbol):
                 if len(symbol.rules) == 1:
+                    names = ast.NameGetter.visit(symbol.rules[None])
+                    needed_names = []
+                    for name in names:
+                        if self.symbol_table.is_global(name):
+                            continue
+                        s = self.symbol_table.resolve(name)
+                        if not isinstance(s, symboltable.ParameterSymbol):
+                            needed_names.append(name)
                     res = self.visit(symbol.rules[None])
                     code = f'    return {res}'
-                    indices = ', '.join(symbol.indices) if symbol.indices else ''
-                    self.definitions.append(template.format(name=symbol.name, args=indices, code=code))
                 else:
                     code = ''
+                    needed_names = []
                     for constraint, value in symbol.rules.items():
+                        names = ast.NameGetter.visit(value)
+                        for name in names:
+                            if name in symbol.indices:
+                                needed_names.append(name)
+                            elif self.symbol_table.is_global(name):
+                                continue
+                            else:
+                                s = self.symbol_table.resolve(name)
+                                if not isinstance(s, symboltable.ParameterSymbol):
+                                    needed_names.append(name)
+
                         expr = self.visit(value)
                         if constraint is not None:
                             cond = self.visit(constraint)
@@ -100,8 +118,9 @@ def {name}(self, {args}):
                             code += f'        return {expr}\n'
                         else:
                             code += f'    return {expr}'
-                    indices = ', '.join(symbol.indices)
-                    self.definitions.append(template.format(name=symbol.name, args=indices, code=code))
+
+                indices = ', '.join(needed_names)
+                self.definitions.append(template.format(name=symbol.name, args=indices, code=code))
 
     def visit_Method(self, node: ast.Method) -> str:
         code_lines = []
@@ -124,17 +143,24 @@ def {name}(self, {args}):
         return node.n
 
     def visit_Name(self, node: ast.Name) -> str:
-        symbol = symboltable.SymbolTable.get_table(node).resolve(node.name)
+        symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(node.name)
         if isinstance(symbol, symboltable.ExprSymbol):
-            return f'self.{node.name}()'
+            names = ast.NameGetter.visit(symbol.rules[None])
+            needed_names = []
+            for name in names:
+                if not self.symbol_table.is_global(name):
+                    needed_names.append(name)
+
+            args = ', '.join(needed_names)
+            return f'self.{node.name}({args})'
 
         return node.name
 
     def visit_Subscript(self, node: ast.Subscript) -> str:
         if self.resolving_node is not None:
-            symbol = symboltable.SymbolTable.get_table(self.resolving_node).resolve(node.name.name)
+            symbol = symboltable.SymbolTable.get_table_for_node(self.resolving_node).resolve(node.name.name)
         else:
-            symbol = symboltable.SymbolTable.get_table(node).resolve(node.name.name)
+            symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(node.name.name)
         if isinstance(symbol, symboltable.VariableSymbol):
             name = 'charges' if symbol.name == 'q' else symbol.name
             indices = ', '.join(f'{self.visit(idx)}.index' for idx in node.indices)
@@ -255,7 +281,7 @@ def {name}(self, {args}):
                 needed_names.append(name)
 
         args = ', '.join(['molecule'] + needed_names)
-        symbol = self.symbol_table.resolve(obj)
+        symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(obj)
         old = self.resolving_node
         self.resolving_node = node
         if symbol.constraints is not None:
