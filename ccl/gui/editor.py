@@ -13,7 +13,7 @@ from ccl.gui.syntax import SyntaxHighlighter, CCLHighlighter
 
 
 class Editor(QWidget):
-    def __init__(self) -> None:
+    def __init__(self, initial_file: Optional[str]) -> None:
         super().__init__()
         self.editor: QPlainTextEdit = QPlainTextEdit(self)
         self.code: QPlainTextEdit = QPlainTextEdit(self)
@@ -23,6 +23,15 @@ class Editor(QWidget):
         self.editor_highlight: CCLHighlighter = CCLHighlighter(self.editor.document())
         self.code_highlight: Optional[SyntaxHighlighter] = None
         self.initUI()
+
+        if initial_file is not None:
+            self.load_file(initial_file)
+
+    def load_file(self, filename: str):
+        with open(filename) as f:
+            data = f.read()
+
+        self.editor.setPlainText(data)
 
     def highlight_error(self, line: int) -> None:
         block = self.editor.document().findBlockByLineNumber(line - 1)
@@ -102,14 +111,11 @@ class Editor(QWidget):
         layout.addWidget(self.code)
         self.setLayout(layout)
 
-        with open('examples/peoe.ccl') as f:
-            data = f.read()
-
-        self.editor.setPlainText(data)
         self.showMaximized()
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    editor = Editor()
+    file = sys.argv[1] if len(sys.argv) > 1 else None
+    editor = Editor(file)
     sys.exit(app.exec_())
