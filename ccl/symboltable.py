@@ -250,10 +250,12 @@ class SymbolTableBuilder(ast.ASTVisitor):
             raise RuntimeError('We should not get here')
 
     def visit_Name(self, node: ast.Name) -> None:
-        symbol = self.current_table.resolve(node.name)
+        name = self.indices_mapping.get(node.name, node.name)
+
+        symbol = self.current_table.resolve(name)
         if symbol:
             if isinstance(symbol, ObjectSymbol):
-                if node.name not in self.iterating_over:
+                if name not in self.iterating_over:
                     raise CCLTypeError(node, f'Symbol {node.name} not bound to For/ForEach/Sum')
 
                 if node.ctx == ast.VarContext.LOAD and not self.inside_constraint:
@@ -268,13 +270,13 @@ class SymbolTableBuilder(ast.ASTVisitor):
             else:
                 node.result_type = symbol.symbol_type
         if node.ctx == ast.VarContext.LOAD and symbol is None:
-            raise CCLSymbolError(node, f'Symbol {node.name} used but not defined')
+            raise CCLSymbolError(node, f'Symbol {name} used but not defined')
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
-        self.visit(node.name)
 
         symbol = self.current_table.resolve(node.name.name)
         if isinstance(symbol, ParameterSymbol) and symbol.kind == ast.ParameterType.ATOM:
+            self.visit(node.name)
             if len(node.indices) != 1:
                 raise CCLTypeError(node, f'Atom parameter {node.name.name} must have one index only')
 
@@ -285,6 +287,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
             node.result_type = ast.NumericType.FLOAT
         elif isinstance(symbol, ParameterSymbol) and symbol.kind == ast.ParameterType.BOND:
+            self.visit(node.name)
             for idx in node.indices:
                 self.visit(idx)
             if len(node.indices) == 1 and node.indices[0].result_type != ast.ObjectType.BOND:
@@ -296,6 +299,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
             node.result_type = ast.NumericType.FLOAT
         elif isinstance(symbol, VariableSymbol) and symbol.types:
+            self.visit(node.name)
             for idx in node.indices:
                 self.visit(idx)
             index_types = tuple(idx.result_type for idx in node.indices)
@@ -305,6 +309,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
             node.result_type = symbol.kind
         elif isinstance(symbol, FunctionSymbol):
+            self.visit(node.name)
             for idx in node.indices:
                 self.visit(idx)
             index_types = tuple(idx.result_type for idx in node.indices)
@@ -317,10 +322,10 @@ class SymbolTableBuilder(ast.ASTVisitor):
             types = set()
             for expr in symbol.rules.values():
                 node_indices = [idx.name for idx in node.indices]
-                self.indices_mapping.update({ni: ei for ni, ei in zip(node_indices, symbol.indices)})
+                self.indices_mapping.update({ei: ni for ni, ei in zip(node_indices, symbol.indices)})
                 self.visit(expr)
                 types.add(expr.result_type)
-                for name in node_indices:
+                for name in symbol.indices:
                     self.indices_mapping.pop(name)
 
             if len(types) > 1:
@@ -362,6 +367,9 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 table = self.current_table.find_parent_table(names)
                 table.define(VariableSymbol(node.lhs.name.name, node, rtype, types))
         elif isinstance(node.lhs, ast.Name):
+            symbol = self.current_table.resolve(node.lhs.name)
+            if symbol is not None and isinstance(symbol, ExprSymbol):
+                raise CCLTypeError(node, f'Cannot assign to expression symbol {node.lhs.name}')
             self.visit(node.lhs)
             ltype = node.lhs.result_type
             if ltype is None:  # Create a new symbol
