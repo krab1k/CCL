@@ -44,7 +44,7 @@ STRING: '"' (DIGIT | LETTER)+ '"';
 COMMENT: '#' .*? NL -> skip;
 WS: [ \t\n] -> channel(HIDDEN);
 
-NUMBER: '-'? DIGIT+ ('.' DIGIT+)?;
+NUMBER: '-'? DIGIT+ ('.' DIGIT*)?;
 NAME: LETTER+;
 
 ERROR_CHAR: .;
