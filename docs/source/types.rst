@@ -1,3 +1,5 @@
+.. _Types:
+
 =====
 Types
 =====
@@ -15,6 +17,8 @@ Object types
 ============
 
 Two object types are available, i.e., ``Atom`` and ``Bond``.
+
+.. _Complex types:
 
 Complex (Array) types
 =====================

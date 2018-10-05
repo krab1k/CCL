@@ -19,3 +19,4 @@ Charge Calculation Language (CCL) Specification
    annotations
    constraints
    statements
+   examples

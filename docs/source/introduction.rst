@@ -13,6 +13,8 @@ Example
 One of the most famous empirical methods is Partial Equalization of Orbital Electronegativity (PEOE) by Gasteiger and Marsili.
 It's an iterative approach in which the charge is shifted between bonded atoms. The amount of charge transferred between two atoms is proportional to the difference of their electronegativities. Here PEOE is written in CCL:
 
+.. _PEOE example:
+
 .. literalinclude:: ../../examples/peoe.ccl
     :language: ccl
 

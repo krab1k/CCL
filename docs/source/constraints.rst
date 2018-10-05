@@ -46,3 +46,11 @@ Satisfied when object ``i`` is at most ``distance`` from object ``j``.
 Comparison
 ==========
 
+Second type of constraint is the comparison of two expressions.
+Common :ref:`relational operators <Relational operators>` can be used.
+
+Following example from :ref:`PEOE method <PEOE example>` shows both constraint types:
+
+.. code-block:: ccl
+
+    j is atom such that bonded(i, j) and chi[j] > chi[i]

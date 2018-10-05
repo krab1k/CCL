@@ -8,3 +8,6 @@ There must be at least one statement, annotations are optional (but necessary in
 Statements are separated from annotations by ``where`` keyword.
 
 When CCL code is being processed, annotations are read first to define meaning for the symbols, then the statements are analyzed.
+
+Partial atomic charges are stored in vector ``q`` which is implicitly defined as ``Float[Atom]``
+(see :ref:`Complex types <Complex types>`) in each method.

@@ -16,6 +16,8 @@ Example of annotations for all three kinds is listed here:
     B is bond parameter
     C is common parameter
 
+.. _Object annotation:
+
 Object annotations
 ==================
 
