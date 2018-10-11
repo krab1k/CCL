@@ -1,0 +1,8 @@
+# EEM: Electronegativity Equalization Method
+
+q = EE[i, j](-A[i], B[i], 1 / R[i, j])
+
+where
+
+A is atom parameter
+B is atom parameter

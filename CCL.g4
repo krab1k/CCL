@@ -39,12 +39,13 @@ string: STRING;
 fragment NL: '\r'? '\n';
 fragment DIGIT: [0-9];
 fragment LETTER: [a-zA-Z];
-STRING: '"' (DIGIT | LETTER)+ '"';
+fragment ALPHA: DIGIT | LETTER;
+STRING: '"' ALPHA+ '"';
 
 COMMENT: '#' .*? NL -> skip;
 WS: [ \t\n] -> channel(HIDDEN);
 
 NUMBER: '-'? DIGIT+ ('.' DIGIT*)?;
-NAME: LETTER+;
+NAME: LETTER ALPHA*;
 
 ERROR_CHAR: .;

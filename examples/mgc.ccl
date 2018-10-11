@@ -1,0 +1,19 @@
+# MGC: Molecular Graph Charge Model
+
+for each atom i:
+X0[i] = E[i]
+done
+
+S = -A + D + I
+X = solve(S, X0)
+
+Xm = sum[j](X[j]) ** (1 / n)
+
+q = (X - X0) / Xm
+
+where
+A is connectivity matrix
+D is degree matrix
+I is identity matrix
+E is property electronegativity
+j is atom

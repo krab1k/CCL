@@ -1,0 +1,20 @@
+for each atom i:
+    alpha = sum[j]((E[j] - E[i]) / a[i])
+    beta =  sum[k]((E[k] - E[h]) * P[i] / b[i]))
+    gamma = sum[l]((E[k] - E[h]) * P[i] / b[i] / c[i])
+    q[i] = alpha + beta + gamma
+done
+
+where
+E is property electronegativity
+# E[h] = E[hydrogen atom]
+a is atom parameter
+b is atom parameter
+c is atom parameter
+P is atom parameter
+alpha is common parameter
+j is atom such that bonded(j, i)
+k is atom such that bond_distance(k, i, 2)
+l is atom such that bond_distance(l, i, 3)
+q0 is property formal_charge
+P[i] = P[i] * (1 + alpha * (q0 - q[i]))
