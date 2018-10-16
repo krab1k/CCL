@@ -1,6 +1,6 @@
 for each atom i:
     alpha = sum[j]((E[j] - E[i]) / a[i])
-    beta =  sum[k]((E[k] - E[h]) * P[i] / b[i]))
+    beta =  sum[k]((E[k] - E[h]) * P[i] / b[i])
     gamma = sum[l]((E[k] - E[h]) * P[i] / b[i] / c[i])
     q[i] = alpha + beta + gamma
 done
