@@ -19,5 +19,5 @@ B is atom parameter
 C is atom parameter
 j is atom such that bonded(i, j) and chi[j] > chi[i]
 k is atom such that bonded(i, k) and chi[k] < chi[i]
-d[i] = 20.02 if element(i, "hydrogen")
+d[i] = 20.02 if element(i, hydrogen)
 d[i] = A[i] + B[i] + C[i]

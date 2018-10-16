@@ -32,15 +32,13 @@ constraint: left=constraint op=('and' | 'or') right=constraint                #A
            | pred=NAME '(' args+=arg (',' args+=arg )* ')'                    #PredicateConstraint
            ;
 
-arg: basename | number | string;
+arg: basename | number;
 number: NUMBER;
-string: STRING;
 
 fragment NL: '\r'? '\n';
 fragment DIGIT: [0-9];
 fragment LETTER: [a-zA-Z];
 fragment ALPHA: DIGIT | LETTER;
-STRING: '"' ALPHA+ '"';
 
 COMMENT: '#' .*? NL -> skip;
 WS: [ \t\n] -> channel(HIDDEN);

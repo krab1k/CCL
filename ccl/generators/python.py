@@ -256,7 +256,7 @@ def {name}(self, {args}):
         if node.name == 'bonded':
             return f'molecule.graph.bonded({args})'
         if node.name == 'element':
-            return f'{arg_list[0]}.element.name.lower() == {arg_list[1]}.lower()'
+            return f'{arg_list[0]}.element.name.lower() == \'{arg_list[1]}\'.lower()'
 
         return f'{node.name}({args})'
 

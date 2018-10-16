@@ -27,7 +27,6 @@ class CCLLexer(RegexLexer):
             (r'=|==|!=|<|<=|>|>=|\+|\*|\^|-|/', token.Operator),
             (words(KEYWORDS, suffix=r'\b'), token.Keyword),
             (words(['atom', 'bond', 'common'], suffix=r'\b'), token.Name.Builtin),
-            (r'("[^"]*")', token.String),
             (r'\w+', token.Text),
         ]
     }

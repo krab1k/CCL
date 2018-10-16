@@ -87,9 +87,6 @@ class Parser(CCLVisitor):
         args = [self.visit(arg) for arg in ctx.args]
         return ast.Predicate(self.get_pos(ctx), name, args)
 
-    def visitString(self, ctx: CCLParser.StringContext) -> ast.String:
-        return ast.String(self.get_pos(ctx), ctx.getText().strip('"'))
-
     def visitExprAnnotation(self, ctx: CCLParser.ExprAnnotationContext) -> ast.ExprAnnotation:
         self._name_handling = ast.VarContext.LOAD
         lhs = self.visit(ctx.var())
@@ -172,5 +169,5 @@ class Parser(CCLVisitor):
     def visitNameAnnotation(self, ctx: CCLParser.NameAnnotationContext) -> ast.Property:
         name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
         names = ' '.join(name.text for name in ctx.ntype)
-        prop = ast.String(self.get_pos(ctx.ntype[0]), names)
+        prop = ast.Name(self.get_pos(ctx.ntype[0]), names, ast.VarContext.ANNOTATION)
         return ast.Property(self.get_pos(ctx), name, prop)

@@ -305,10 +305,10 @@ class ForEach(Statement):
 
 
 class Property(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, prop: String) -> None:
+    def __init__(self, pos: Tuple[int, int], name: Name, prop: Name) -> None:
         super().__init__(pos)
         self.name: Name = name
-        self.prop: String = prop
+        self.prop: Name = prop
 
 
 def is_atom(node: ASTNode) -> bool:

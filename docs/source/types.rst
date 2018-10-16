@@ -9,9 +9,8 @@ CCL is a strongly-typed language. When new variable is created, its type is infe
 Simple types
 ============
 
-There are two numeric types, namely ``Int`` and ``Float``, ``String`` and ``Bool``. Assignment of ``Int`` expression to ``Float`` variable
-is possible, but not the other way around. ``String`` can only be a constant used as arguments in functions. ``Bool`` type
-is used internally by CCL when evaluating :ref:`Constraints`.
+There are two numeric types, namely ``Int`` and ``Float``, and ``Bool``. Assignment of ``Int`` expression to ``Float`` variable
+is possible, but not the other way around. ``Bool`` type is used internally by CCL when evaluating :ref:`Constraints`.
 
 Object types
 ============
