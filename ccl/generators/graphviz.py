@@ -17,7 +17,7 @@ class GraphNode:
         self.properties: List[str] = []
 
     def __str__(self) -> str:
-        property_string = '<br/>'.join(prop for prop in self.properties)
+        property_string = '<br/>'.join(prop for prop in self.properties if not prop.startswith('_'))
         return f'node{self.idx} [label = < <b>{self.node_type}</b><br/> {property_string} >]'
 
 
