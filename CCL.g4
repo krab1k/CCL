@@ -22,8 +22,8 @@ subscript: name=NAME '[' indices+=NAME (',' indices+=NAME)? ']';
 
 annotation: var '=' expr ('if' constraint)?                                     #ExprAnnotation
           | name=NAME 'is' ptype=('atom' | 'bond' | 'common') 'parameter'       #ParameterAnnotation
-          | name=NAME 'is' abtype=('atom' | 'bond') ('such that' constraint)?   #ABAnnotation
-          | name=NAME 'is property' prop=NAME                                   #PropertyAnnotation
+          | name=NAME 'is' objtype=('atom' | 'bond') ('such that' constraint)?  #ObjectAnnotation
+          | name=NAME 'is' ntype+=NAME+                                         #NameAnnotation
           ;
 constraint: left=constraint op=('and' | 'or') right=constraint                #AndOrConstraint
            | 'not' constraint                                                 #NotConstraint

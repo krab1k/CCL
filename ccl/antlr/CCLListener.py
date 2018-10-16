@@ -152,21 +152,21 @@ class CCLListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by CCLParser#ABAnnotation.
-    def enterABAnnotation(self, ctx:CCLParser.ABAnnotationContext):
+    # Enter a parse tree produced by CCLParser#ObjectAnnotation.
+    def enterObjectAnnotation(self, ctx:CCLParser.ObjectAnnotationContext):
         pass
 
-    # Exit a parse tree produced by CCLParser#ABAnnotation.
-    def exitABAnnotation(self, ctx:CCLParser.ABAnnotationContext):
+    # Exit a parse tree produced by CCLParser#ObjectAnnotation.
+    def exitObjectAnnotation(self, ctx:CCLParser.ObjectAnnotationContext):
         pass
 
 
-    # Enter a parse tree produced by CCLParser#PropertyAnnotation.
-    def enterPropertyAnnotation(self, ctx:CCLParser.PropertyAnnotationContext):
+    # Enter a parse tree produced by CCLParser#NameAnnotation.
+    def enterNameAnnotation(self, ctx:CCLParser.NameAnnotationContext):
         pass
 
-    # Exit a parse tree produced by CCLParser#PropertyAnnotation.
-    def exitPropertyAnnotation(self, ctx:CCLParser.PropertyAnnotationContext):
+    # Exit a parse tree produced by CCLParser#NameAnnotation.
+    def exitNameAnnotation(self, ctx:CCLParser.NameAnnotationContext):
         pass
 
 

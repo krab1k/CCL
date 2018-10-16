@@ -89,13 +89,13 @@ class CCLVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#ABAnnotation.
-    def visitABAnnotation(self, ctx:CCLParser.ABAnnotationContext):
+    # Visit a parse tree produced by CCLParser#ObjectAnnotation.
+    def visitObjectAnnotation(self, ctx:CCLParser.ObjectAnnotationContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#PropertyAnnotation.
-    def visitPropertyAnnotation(self, ctx:CCLParser.PropertyAnnotationContext):
+    # Visit a parse tree produced by CCLParser#NameAnnotation.
+    def visitNameAnnotation(self, ctx:CCLParser.NameAnnotationContext):
         return self.visitChildren(ctx)
 
 

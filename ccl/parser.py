@@ -54,9 +54,9 @@ class Parser(CCLVisitor):
         ptype = ctx.ptype.text.capitalize()
         return ast.ParameterAnnotation(self.get_pos(ctx), name, ptype)
 
-    def visitABAnnotation(self, ctx: CCLParser.ABAnnotationContext) -> ast.ObjectAnnotation:
+    def visitObjectAnnotation(self, ctx: CCLParser.ObjectAnnotationContext) -> ast.ObjectAnnotation:
         name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
-        object_type = ctx.abtype.text.capitalize()
+        object_type = ctx.objtype.text.capitalize()
         if ctx.constraint():
             constraint = self.visit(ctx.constraint())
         else:
@@ -169,7 +169,8 @@ class Parser(CCLVisitor):
 
         return ast.ForEach(self.get_pos(ctx), name, object_type, constraint, body)
 
-    def visitPropertyAnnotation(self, ctx: CCLParser.PropertyAnnotationContext) -> ast.Property:
+    def visitNameAnnotation(self, ctx: CCLParser.NameAnnotationContext) -> ast.Property:
         name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
-        prop = ast.String(self.get_pos(ctx.prop), ctx.prop.text)
+        names = ' '.join(name.text for name in ctx.ntype)
+        prop = ast.String(self.get_pos(ctx.ntype[0]), names)
         return ast.Property(self.get_pos(ctx), name, prop)
