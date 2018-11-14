@@ -442,7 +442,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         node.result_type = node.expr.result_type
 
     def visit_Property(self, node: ast.Property) -> None:
-        fname = node.prop.s
+        fname = node.prop.name
         try:
             f = FUNCTIONS[fname]
         except KeyError:
