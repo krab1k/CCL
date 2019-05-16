@@ -1,4 +1,4 @@
-# Generated from /home/krab1k/Research/CCL/CCL.g4 by ANTLR 4.7
+# Generated from /home/krab1k/Research/CCL/CCL.g4 by ANTLR 4.7.2
 from antlr4 import *
 if __name__ is not None and "." in __name__:
     from .CCLParser import CCLParser
@@ -131,11 +131,6 @@ class CCLVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by CCLParser#number.
     def visitNumber(self, ctx:CCLParser.NumberContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by CCLParser#string.
-    def visitString(self, ctx:CCLParser.StringContext):
         return self.visitChildren(ctx)
 
 

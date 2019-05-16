@@ -1,4 +1,4 @@
-# Generated from /home/krab1k/Research/CCL/CCL.g4 by ANTLR 4.7
+# Generated from /home/krab1k/Research/CCL/CCL.g4 by ANTLR 4.7.2
 from antlr4 import *
 if __name__ is not None and "." in __name__:
     from .CCLParser import CCLParser
@@ -230,15 +230,6 @@ class CCLListener(ParseTreeListener):
 
     # Exit a parse tree produced by CCLParser#number.
     def exitNumber(self, ctx:CCLParser.NumberContext):
-        pass
-
-
-    # Enter a parse tree produced by CCLParser#string.
-    def enterString(self, ctx:CCLParser.StringContext):
-        pass
-
-    # Exit a parse tree produced by CCLParser#string.
-    def exitString(self, ctx:CCLParser.StringContext):
         pass
 
 
