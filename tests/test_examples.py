@@ -12,3 +12,5 @@ def test_examples(method):
     except CCLCodeError as e:
         line = data.split('\n')[e.line - 1]
         pytest.fail(f'{method}:{e.line}:{e.column}: {line}: {e.message}')
+    except Exception as e:
+        pytest.fail(f'{method}: {e}')
