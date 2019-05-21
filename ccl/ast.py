@@ -234,6 +234,7 @@ class Method(ASTNode):
         self.statements: List[Statement] = statements
         self.annotations: List[Annotation] = annotations
         self.symbol_table = None
+        self.name = 'CCL_Method'
 
     def print_ast(self) -> None:
         for s in self.statements:

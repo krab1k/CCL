@@ -21,7 +21,7 @@ def get_name(name: str) -> str:
 
 # noinspection PyPep8Naming
 class Latex(ast.ASTVisitor):
-    def __init__(self, symbol_table: symboltable.SymbolTable) -> None:
+    def __init__(self, symbol_table: symboltable.SymbolTable, **kwargs) -> None:
         super().__init__()
         self.depth: int = 0
         self.symbol_table: symboltable.SymbolTable = symbol_table

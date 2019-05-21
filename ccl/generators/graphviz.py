@@ -22,7 +22,7 @@ class GraphNode:
 
 
 class Graphviz(ast.ASTVisitor):
-    def __init__(self, table: symboltable.SymbolTable) -> None:
+    def __init__(self, table: symboltable.SymbolTable, **kwargs) -> None:
         super().__init__()
         self.nodes: List[GraphNode] = []
         self.edges: List[str] = []

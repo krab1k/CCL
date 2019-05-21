@@ -33,7 +33,7 @@ class ChargeMethod(ChargeCalculationMethod):
 
 # noinspection PyPep8Naming
 class Python(ast.ASTVisitor):
-    def __init__(self, symbol_table: symboltable.SymbolTable) -> None:
+    def __init__(self, symbol_table: symboltable.SymbolTable, **kwargs) -> None:
         super().__init__()
         self.symbol_table: symboltable.SymbolTable = symbol_table
         self.definitions: List[str] = []

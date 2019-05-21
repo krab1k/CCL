@@ -1,58 +1,25 @@
 """Translate method in CCL to C++"""
 
-from ccl import ast, symboltable
-
+import os
 from typing import Tuple, Union, Optional, List
+
+from ccl import ast, symboltable
 
 __all__ = ['Cpp']
 
-header_template = '''\
-#pragma once
+with open('ccl/generators/cpp/templates/method.h') as f:
+    header_template = f.read()
 
-#include <boost/config.hpp>
+with open('ccl/generators/cpp/templates/method.cpp') as f:
+    method_template = f.read()
 
-#include "../Method.h"
-#include "../structures/Molecule.h"
-
-class New : public Method {{
-    {common_parameters_enum}
-    {atom_parameters_enum}
-    {bond_parameters_enum}
-    {prototypes}
-public:
-    explicit New() : Method({common_parameters}, {atom_parameters}, {bond_parameters}) {{}};
-
-    std::vector<double> calculate_charges(const Molecule &molecule) override;
-}};
-
-extern "C" BOOST_SYMBOL_EXPORT New method;
-New method;
-'''
-
-method_template = '''\
-
-#include <vector>
-#include <cmath>
-{sys_includes}
-{user_includes}
-#include "New.h"
-#include "../structures/Molecule.h"
-#include "../Parameters.h"
-
-{defs}
-
-std::vector<double> New::calculate_charges(const Molecule &molecule) {{
-    auto n = static_cast<int>(molecule.atoms().size());
-    std::vector<double> q(n, 0);
-{code}
-    return q;
-}}
-'''
+with open('ccl/generators/cpp/templates/CMakeLists.txt') as f:
+    cmake_template = f.read()
 
 
 # noinspection PyPep8Naming
 class Cpp(ast.ASTVisitor):
-    def __init__(self, symbol_table: symboltable.SymbolTable) -> None:
+    def __init__(self, symbol_table: symboltable.SymbolTable, output_dir: str = None) -> None:
         super().__init__()
         self.symbol_table: symboltable.SymbolTable = symbol_table
         self.depth: int = 1
@@ -60,6 +27,8 @@ class Cpp(ast.ASTVisitor):
         self.sum_count: int = 0
         self.prototypes: List[str] = []
         self.definitions: List[str] = []
+        self.output_dir: Optional[str] = output_dir
+        self.method_name: str = ''
 
     def p(self, string: str) -> str:
         return ' ' * self.depth * 4 + string
@@ -77,7 +46,6 @@ class Cpp(ast.ASTVisitor):
                 sizes_str = ', '.join(sizes)
                 if len(symbol.types) > 1:
                     raise NotImplementedError('Only 1D arrays are supported')
-                    sizes_str = f'({sizes})'
                 code.append(self.p(f'std::vector<double> {symbol.name} ({sizes_str}, 0);'))
         return '\n'.join(code) + '\n' if code else ''
 
@@ -103,73 +71,89 @@ class Cpp(ast.ASTVisitor):
         return atom_str, bond_str, common_str, atom_enum, bond_enum, common_enum
 
     def process_expressions(self) -> None:
-            template = '''\
-double New::{name}({args}) {{
-{code}}}
-    '''
-            for symbol in self.symbol_table.symbols.values():
-                if isinstance(symbol, symboltable.ExprSymbol):
-                    if len(symbol.rules) == 1:
-                        names = ast.NameGetter.visit(symbol.rules[None])
-                        needed_names = []
+        template = '''\
+double {method_name}::{name}({args}) const {{
+{code}
+}}
+'''
+        for symbol in self.symbol_table.symbols.values():
+            if isinstance(symbol, symboltable.ExprSymbol):
+                if len(symbol.rules) == 1:
+                    names = ast.NameGetter.visit(symbol.rules[None])
+                    needed_names = []
+                    for name in names:
+                        if self.symbol_table.is_global(name):
+                            continue
+                        s = self.symbol_table.resolve(name)
+                        if not isinstance(s, symboltable.ParameterSymbol):
+                            needed_names.append(name)
+                    res = self.visit(symbol.rules[None])
+                    code = f'    return {res};\n'
+                else:
+                    code = ''
+                    needed_names = []
+                    for constraint, value in symbol.rules.items():
+                        names = ast.NameGetter.visit(value)
                         for name in names:
-                            if self.symbol_table.is_global(name):
+                            if name in symbol.indices:
+                                # TODO what about bonds?
+                                needed_names.append(f'const Atom &{name}')
+                            elif self.symbol_table.is_global(name):
                                 continue
-                            s = self.symbol_table.resolve(name)
-                            if not isinstance(s, symboltable.ParameterSymbol):
-                                needed_names.append(name)
-                        res = self.visit(symbol.rules[None])
-                        code = f'    return {res};\n'
-                    else:
-                        code = ''
-                        needed_names = []
-                        for constraint, value in symbol.rules.items():
-                            names = ast.NameGetter.visit(value)
-                            for name in names:
-                                if name in symbol.indices:
-                                    #TODO what about bonds?
-                                    needed_names.append(f'const Atom &{name}')
-                                elif self.symbol_table.is_global(name):
-                                    continue
-                                else:
-                                    s = self.symbol_table.resolve(name)
-                                    if not isinstance(s, symboltable.ParameterSymbol):
-                                        needed_names.append(name)
-
-                            expr = self.visit(value)
-                            if constraint is not None:
-                                cond = self.visit(constraint)
-                                code += f'    if({cond})\n'
-                                code += f'        return {expr};\n'
                             else:
-                                code += f'    return {expr};\n'
+                                s = self.symbol_table.resolve(name)
+                                if not isinstance(s, symboltable.ParameterSymbol):
+                                    needed_names.append(name)
 
-                    indices = ', '.join(needed_names)
-                    self.prototypes.append(f'double {symbol.name}({indices});')
-                    self.definitions.append(template.format(name=symbol.name, args=indices, code=code))
+                        expr = self.visit(value)
+                        if constraint is not None:
+                            cond = self.visit(constraint)
+                            code += f'    if({cond})\n'
+                            code += f'        return {expr};\n'
+                        else:
+                            code += f'    return {expr};\n'
+
+                indices = ', '.join(needed_names)
+                self.prototypes.append(f'double {symbol.name}({indices}) const;')
+                self.definitions.append(
+                    template.format(method_name=self.method_name, name=symbol.name, args=indices, code=code))
 
     def visit_Method(self, node: ast.Method) -> str:
         code_lines = []
+
+        self.method_name = node.name
 
         self.process_expressions()
         for statement in node.statements:
             code_lines.append(str(self.visit(statement)))
 
         code = '\n'.join(code_lines)
-        sys_includes = ""
-        user_includes = ""
+        sys_includes = ''
+        user_includes = ''
 
         atom_str, bond_str, common_str, atom_enum, bond_enum, common_enum = self.get_parameters()
         defs = '\n'.join(f'{line}' for d in self.definitions for line in d.split('\n'))
         prototypes = '\n    '.join(self.prototypes)
 
-        header = header_template.format(common_parameters=common_str, atom_parameters=atom_str,
+        header = header_template.format(method_name=self.method_name, common_parameters=common_str,
+                                        atom_parameters=atom_str,
                                         bond_parameters=bond_str,
                                         common_parameters_enum=common_enum, atom_parameters_enum=atom_enum,
                                         bond_parameters_enum=bond_enum,
                                         prototypes=prototypes)
-        method = method_template.format(code=code, sys_includes=sys_includes, user_includes=user_includes,
+        method = method_template.format(method_name=self.method_name,
+                                        code=code, sys_includes=sys_includes, user_includes=user_includes,
                                         defs=defs)
+
+        if self.output_dir is not None:
+            with open(os.path.join(self.output_dir, 'ccl_method.h'), 'w') as f:
+                f.write(header)
+
+            with open(os.path.join(self.output_dir, 'ccl_method.cpp'), 'w') as f:
+                f.write(method)
+
+            with open(os.path.join(self.output_dir, 'CMakeLists.txt'), 'w') as f:
+                f.write(cmake_template.format(method_name=self.method_name))
 
         return header + method
 
@@ -290,7 +274,7 @@ double New::{name}({args}) {{
 
     def visit_Sum(self, node: ast.Sum) -> str:
         template = '''\
-double New::{name}({args}) {{
+double {method_name}::{name}({args}) const {{
     double total = 0;
     for(const auto &{obj}: molecule.{kind}s()) {{
         if({cond}) {{
@@ -333,6 +317,8 @@ double New::{name}({args}) {{
             cond = ''
         self.resolving_node = old
         kind = symbol.kind.value.lower()
-        self.prototypes.append(f'double {fname}({f_args});')
-        self.definitions.append(template.format(name=fname, obj=obj, args=f_args, kind=kind, cond=cond, expr=expr))
+        self.prototypes.append(f'double {fname}({f_args}) const;')
+        self.definitions.append(
+            template.format(method_name=self.method_name, name=fname, obj=obj, args=f_args, kind=kind, cond=cond,
+                            expr=expr))
         return f'{fname}({args})'

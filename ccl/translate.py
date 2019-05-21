@@ -9,7 +9,7 @@ from ccl.symboltable import SymbolTable
 from ccl.parser import Parser, CCLErrorListener
 
 
-def translate(source: str, output_language: Optional[str]) -> Optional[str]:
+def translate(source: str, output_language: Optional[str] = None, output_dir: Optional[str] = None) -> Optional[str]:
     if output_language is not None:
         try:
             module = importlib.import_module(f'ccl.generators.{output_language}')
@@ -29,6 +29,7 @@ def translate(source: str, output_language: Optional[str]) -> Optional[str]:
     table = SymbolTable.create_from_ast(ast)
 
     if output_language is not None:
-        g = generator(table)
+        g = generator(table, output_dir=output_dir)
         code = str(g.visit(ast))
         return code
+
