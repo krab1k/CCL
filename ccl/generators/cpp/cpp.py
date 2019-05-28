@@ -158,7 +158,7 @@ double {method_name}::{name}({args}) const {{
         return header + method
 
     def visit_Number(self, node: ast.Number) -> Union[int, float]:
-        return node.n
+        return node.val
 
     def visit_Name(self, node: ast.Name) -> str:
         return node.name

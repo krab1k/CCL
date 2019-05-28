@@ -12,7 +12,7 @@ done
 where
 A is atom parameter
 B is atom parameter
-r is property vdwradius
+r is vdwradius
 f[i, j] = 1 - R[i, j] / (r[i] + r[j])
 j is atom such that bonded(i, j) and chi[j] > chi[i]
 k is atom such that bonded(i, k) and chi[k] < chi[i]

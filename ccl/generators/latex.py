@@ -38,7 +38,7 @@ class Latex(ast.ASTVisitor):
         return f'${plain_name}$'
 
     def visit_Number(self, node: ast.Number) -> Union[int, float]:
-        return node.n
+        return node.val
 
     def visit_For(self, node: ast.For) -> str:
         name_str = self.visit(node.name)
@@ -134,9 +134,6 @@ class Latex(ast.ASTVisitor):
     def visit_UnaryLogicalOp(self, node: ast.UnaryLogicalOp) -> str:
         op = ast.UnaryLogicalOp.Ops(node.op).value
         return f'{op.lower()} ' + self.visit(node.constraint)
-
-    def visit_String(self, node: ast.String) -> str:
-        return f'\\text{{{node.s}}}'
 
     def visit_Predicate(self, node: ast.Predicate) -> str:
         if node.name == 'bonded':

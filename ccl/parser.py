@@ -37,6 +37,8 @@ class Parser(CCLVisitor):
         raise RuntimeError(f'Unknown context {ctx}')
 
     def visitMethod(self, ctx: CCLParser.MethodContext) -> ast.Method:
+        name = ctx.method_name.text
+
         annotations = []
         for annotation in ctx.annotations:
             annotations.append(self.visit(annotation))
@@ -45,23 +47,23 @@ class Parser(CCLVisitor):
         for statement in ctx.body:
             statements.append(self.visitStatement(statement))
 
-        method = ast.Method(self.get_pos(ctx), statements, annotations)
+        method = ast.Method(self.get_pos(ctx), name, statements, annotations)
         ast.ParentSetter().visit(method)
         return method
 
-    def visitParameterAnnotation(self, ctx: CCLParser.ParameterAnnotationContext) -> ast.ParameterAnnotation:
+    def visitParameterAnnotation(self, ctx: CCLParser.ParameterAnnotationContext) -> ast.Parameter:
         name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
-        ptype = ctx.ptype.text.capitalize()
-        return ast.ParameterAnnotation(self.get_pos(ctx), name, ptype)
+        ptype = ast.ParameterType(ctx.ptype.text.capitalize())
+        return ast.Parameter(self.get_pos(ctx), name, ptype)
 
-    def visitObjectAnnotation(self, ctx: CCLParser.ObjectAnnotationContext) -> ast.ObjectAnnotation:
+    def visitObjectAnnotation(self, ctx: CCLParser.ObjectAnnotationContext) -> ast.Object:
         name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
-        object_type = ctx.objtype.text.capitalize()
+        object_type = ast.ObjectType(ctx.objtype.text.capitalize())
         if ctx.constraint():
             constraint = self.visit(ctx.constraint())
         else:
             constraint = None
-        return ast.ObjectAnnotation(self.get_pos(ctx), name, object_type, constraint)
+        return ast.Object(self.get_pos(ctx), name, object_type, constraint)
 
     def visitAndOrConstraint(self, ctx: CCLParser.AndOrConstraintContext) -> ast.BinaryLogicalOp:
         lhs = self.visit(ctx.left)
@@ -87,7 +89,7 @@ class Parser(CCLVisitor):
         args = [self.visit(arg) for arg in ctx.args]
         return ast.Predicate(self.get_pos(ctx), name, args)
 
-    def visitExprAnnotation(self, ctx: CCLParser.ExprAnnotationContext) -> ast.ExprAnnotation:
+    def visitExprAnnotation(self, ctx: CCLParser.ExprAnnotationContext) -> ast.Substitution:
         self._name_handling = ast.VarContext.LOAD
         lhs = self.visit(ctx.var())
         rhs = self.visit(ctx.expr())
@@ -97,7 +99,7 @@ class Parser(CCLVisitor):
             constraint = None
 
         self._name_handling = ast.VarContext.STORE
-        return ast.ExprAnnotation(self.get_pos(ctx), lhs, rhs, constraint)
+        return ast.Substitution(self.get_pos(ctx), lhs, rhs, constraint)
 
     def visitAssign(self, ctx: CCLParser.AssignContext) -> ast.Assign:
         var = self.visit(ctx.lhs)
@@ -117,10 +119,12 @@ class Parser(CCLVisitor):
 
     def visitNumber(self, ctx: CCLParser.NumberContext) -> ast.Number:
         try:
-            n = int(ctx.getText())
+            val = int(ctx.getText())
+            ntype = ast.NumericType.INT
         except ValueError:
-            n = float(ctx.getText())
-        return ast.Number(self.get_pos(ctx), n)
+            val = float(ctx.getText())
+            ntype = ast.NumericType.FLOAT
+        return ast.Number(self.get_pos(ctx), val, ntype)
 
     def visitBasename(self, ctx: CCLParser.BasenameContext) -> ast.Name:
         return ast.Name(self.get_pos(ctx), ctx.name.text, self._name_handling)
@@ -166,8 +170,35 @@ class Parser(CCLVisitor):
 
         return ast.ForEach(self.get_pos(ctx), name, object_type, constraint, body)
 
-    def visitNameAnnotation(self, ctx: CCLParser.NameAnnotationContext) -> ast.Property:
+    def visitPropertyAnnotation(self, ctx: CCLParser.PropertyAnnotationContext) -> ast.Property:
         name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
-        names = ' '.join(name.text for name in ctx.ntype)
-        prop = ast.Name(self.get_pos(ctx.ntype[0]), names, ast.VarContext.ANNOTATION)
+        names = ' '.join(name.text for name in ctx.ptype)
+        prop = ast.Name(self.get_pos(ctx.ptype[0]), names, ast.VarContext.ANNOTATION)
         return ast.Property(self.get_pos(ctx), name, prop)
+
+    def visitConstantAnnotation(self, ctx: CCLParser.ConstantAnnotationContext) -> ast.Constant:
+        name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
+        names = ' '.join(name.text for name in ctx.ptype)
+        prop = ast.Name(self.get_pos(ctx.ptype[0]), names, ast.VarContext.ANNOTATION)
+        element = ast.Name(self.get_pos(ctx.element), ctx.element.text, ast.VarContext.ANNOTATION)
+        return ast.Constant(self.get_pos(ctx), name, prop, element)
+
+    def visitFnExpr(self, ctx: CCLParser.FnExprContext) -> ast.Function:
+        name = ast.Name(self.get_pos(ctx.fn), ctx.fn.text, ast.VarContext.ANNOTATION)
+        arg = self.visit(ctx.fn_arg)
+        return ast.Function(self.get_pos(ctx), name, arg)
+
+    def visitEEExpr(self, ctx: CCLParser.EEExprContext) -> ast.EE:
+        idx_row = ast.Name(self.get_pos(ctx.idx_row), ctx.idx_row.text, ast.VarContext.ANNOTATION)
+        idx_col = ast.Name(self.get_pos(ctx.idx_col), ctx.idx_col.text, ast.VarContext.ANNOTATION)
+        diag = self.visit(ctx.diag)
+        off = self.visit(ctx.off)
+        rhs = self.visit(ctx.rhs)
+        if ctx.ee_type is not None:
+            ee_type = ast.EE.Type(ctx.ee_type.text.capitalize())
+            radius = self.visit(ctx.radius)
+        else:
+            ee_type = ast.EE.Type.FULL
+            radius = None
+
+        return ast.EE(self.get_pos(ctx), idx_row, idx_col, diag, off, rhs, ee_type, radius)

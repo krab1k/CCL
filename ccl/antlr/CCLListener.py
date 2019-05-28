@@ -107,6 +107,24 @@ class CCLListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by CCLParser#EEExpr.
+    def enterEEExpr(self, ctx:CCLParser.EEExprContext):
+        pass
+
+    # Exit a parse tree produced by CCLParser#EEExpr.
+    def exitEEExpr(self, ctx:CCLParser.EEExprContext):
+        pass
+
+
+    # Enter a parse tree produced by CCLParser#FnExpr.
+    def enterFnExpr(self, ctx:CCLParser.FnExprContext):
+        pass
+
+    # Exit a parse tree produced by CCLParser#FnExpr.
+    def exitFnExpr(self, ctx:CCLParser.FnExprContext):
+        pass
+
+
     # Enter a parse tree produced by CCLParser#var.
     def enterVar(self, ctx:CCLParser.VarContext):
         pass
@@ -161,12 +179,21 @@ class CCLListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by CCLParser#NameAnnotation.
-    def enterNameAnnotation(self, ctx:CCLParser.NameAnnotationContext):
+    # Enter a parse tree produced by CCLParser#ConstantAnnotation.
+    def enterConstantAnnotation(self, ctx:CCLParser.ConstantAnnotationContext):
         pass
 
-    # Exit a parse tree produced by CCLParser#NameAnnotation.
-    def exitNameAnnotation(self, ctx:CCLParser.NameAnnotationContext):
+    # Exit a parse tree produced by CCLParser#ConstantAnnotation.
+    def exitConstantAnnotation(self, ctx:CCLParser.ConstantAnnotationContext):
+        pass
+
+
+    # Enter a parse tree produced by CCLParser#PropertyAnnotation.
+    def enterPropertyAnnotation(self, ctx:CCLParser.PropertyAnnotationContext):
+        pass
+
+    # Exit a parse tree produced by CCLParser#PropertyAnnotation.
+    def exitPropertyAnnotation(self, ctx:CCLParser.PropertyAnnotationContext):
         pass
 
 

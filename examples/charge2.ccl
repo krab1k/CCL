@@ -1,3 +1,5 @@
+name charge2
+
 for each atom i:
     alpha = sum[j]((E[j] - E[i]) / a[i])
     beta =  sum[k]((E[k] - E[h]) * P[i] / b[i])

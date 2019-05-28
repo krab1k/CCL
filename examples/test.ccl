@@ -1,19 +1,19 @@
-for alpha = 0 to 10:
-    for each atom i:
-        chi[i] = q[i] * A[i] + B[i]
-    done
+name mgc
 
-    for each atom i:
-        q[i] = q[i] + sum[j]((chi[j] - chi[i]) / d[i] * f[i, j] ^ alpha) + sum[k]((chi[k] - chi[i]) / d[k] * f[i, k] ^ alpha)
-    done
-
+for each atom i:
+X0[i] = E[i]
 done
 
+S = -A + D + I
+X = solve(S, X0)
+
+Xm = sum[j](X[j]) ** (1 / n)
+
+q = (X - X0) / Xm
+
 where
-A is atom parameter
-B is atom parameter
-r is property vdwradius
-f[i, j] = 1 - R[i, j] / (r[i] + r[j])
-j is atom such that bonded(i, j) and chi[j] > chi[i]
-k is atom such that bonded(i, k) and chi[k] < chi[i]
-d[i] = A[i] + B[i]
+A is connectivity matrix
+D is degree matrix
+I is identity matrix
+E is electronegativity
+j is atom

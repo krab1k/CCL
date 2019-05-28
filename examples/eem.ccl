@@ -1,4 +1,4 @@
-# EEM: Electronegativity Equalization Method
+name eem
 
 q = EE[i, j](-A[i], B[i], 1 / R[i, j])
 

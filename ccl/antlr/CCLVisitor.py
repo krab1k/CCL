@@ -64,6 +64,16 @@ class CCLVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by CCLParser#EEExpr.
+    def visitEEExpr(self, ctx:CCLParser.EEExprContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by CCLParser#FnExpr.
+    def visitFnExpr(self, ctx:CCLParser.FnExprContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by CCLParser#var.
     def visitVar(self, ctx:CCLParser.VarContext):
         return self.visitChildren(ctx)
@@ -94,8 +104,13 @@ class CCLVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#NameAnnotation.
-    def visitNameAnnotation(self, ctx:CCLParser.NameAnnotationContext):
+    # Visit a parse tree produced by CCLParser#ConstantAnnotation.
+    def visitConstantAnnotation(self, ctx:CCLParser.ConstantAnnotationContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by CCLParser#PropertyAnnotation.
+    def visitPropertyAnnotation(self, ctx:CCLParser.PropertyAnnotationContext):
         return self.visitChildren(ctx)
 
 

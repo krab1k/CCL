@@ -140,7 +140,7 @@ def {name}(self, {args}):
         return self.p(f'{lhs} = {rhs}')
 
     def visit_Number(self, node: ast.Number) -> Union[int, float]:
-        return node.n
+        return node.val
 
     def visit_Name(self, node: ast.Name) -> str:
         symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(node.name)
@@ -246,9 +246,6 @@ def {name}(self, {args}):
         rhs = self.visit(node.rhs)
         op = node.op.value
         return f'{lhs} {op} {rhs}'
-
-    def visit_String(self, node: ast.String) -> str:
-        return f'\'{node.s}\''
 
     def visit_Predicate(self, node: ast.Predicate) -> str:
         arg_list = [str(self.visit(arg)) for arg in node.args]

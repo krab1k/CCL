@@ -1,4 +1,4 @@
-# SFKEEM: Selfconsistent Functional Kernel Equalized Electronegativity Method
+name sfkeem
 
 q = EE[i, j](-A[i], 2 * B[i], 2 * sqrt(B[i] * B[j]) * sech(sigma * R[i, j])
 
