@@ -84,7 +84,7 @@ def {name}(self, {args}):
 {code}
 '''
         for symbol in self.symbol_table.symbols.values():
-            if isinstance(symbol, symboltable.ExprSymbol):
+            if isinstance(symbol, symboltable.SubstitutionSymbol):
                 if len(symbol.rules) == 1:
                     names = ast.NameGetter.visit(symbol.rules[None])
                     needed_names = []
@@ -143,8 +143,8 @@ def {name}(self, {args}):
         return node.val
 
     def visit_Name(self, node: ast.Name) -> str:
-        symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(node.name)
-        if isinstance(symbol, symboltable.ExprSymbol):
+        symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(node.val)
+        if isinstance(symbol, symboltable.SubstitutionSymbol):
             names = ast.NameGetter.visit(symbol.rules[None])
             needed_names = []
             for name in names:
@@ -152,27 +152,27 @@ def {name}(self, {args}):
                     needed_names.append(name)
 
             args = ', '.join(needed_names)
-            return f'self.{node.name}({args})'
+            return f'self.{node.val}({args})'
 
-        return node.name
+        return node.val
 
     def visit_Subscript(self, node: ast.Subscript) -> str:
         if self.resolving_node is not None:
-            symbol = symboltable.SymbolTable.get_table_for_node(self.resolving_node).resolve(node.name.name)
+            symbol = symboltable.SymbolTable.get_table_for_node(self.resolving_node).resolve(node.name.val)
         else:
-            symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(node.name.name)
+            symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(node.name.val)
         if isinstance(symbol, symboltable.VariableSymbol):
             name = 'charges' if symbol.name == 'q' else symbol.name
             indices = ', '.join(f'{self.visit(idx)}.index' for idx in node.indices)
             return f'{name}[{indices}]'
         if isinstance(symbol, symboltable.ParameterSymbol) and symbol.kind == ast.ParameterType.ATOM:
-            return f'self.parameters.atom[\'{symbol.name}\']({node.indices[0].name})'
+            return f'self.parameters.atom[\'{symbol.name}\']({node.indices[0].val})'
         if isinstance(symbol, symboltable.ParameterSymbol) and symbol.kind == ast.ParameterType.BOND:
             if len(node.indices) == 1:
-                return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].name})'
+                return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].val})'
 
-            return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].name}, {node.indices[1].name})'
-        if isinstance(symbol, symboltable.ExprSymbol):
+            return f'self.parameters.bond[\'{symbol.name}\']({node.indices[0].val}, {node.indices[1].val})'
+        if isinstance(symbol, symboltable.SubstitutionSymbol):
             indices = ', '.join(f'{self.visit(idx)}' for idx in node.indices)
             return f'self.{symbol.name}({indices})'
         if isinstance(symbol, symboltable.FunctionSymbol):
@@ -228,7 +228,7 @@ def {name}(self, {args}):
         code = '\n'.join(statements)
         defines = self.define_new_symbols(node.symbol_table)
         self.depth -= 1
-        kind = ast.ObjectType(node.kind).value.lower()
+        kind = ast.ObjectType(node.type).value.lower()
         return self.p(f'for {name} in molecule.{kind}s:\n{defines}{code}')
 
     def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:

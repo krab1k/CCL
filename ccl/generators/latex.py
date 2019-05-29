@@ -31,7 +31,7 @@ class Latex(ast.ASTVisitor):
         return str(super().visit(node))
 
     def visit_Name(self, node: ast.Name) -> str:
-        plain_name = get_name(node.name)
+        plain_name = get_name(node.val)
         if self.inside_math:
             return plain_name
 
@@ -55,7 +55,7 @@ class Latex(ast.ASTVisitor):
 
     def visit_ForEach(self, node: ast.ForEach) -> str:
         name_str = self.visit(node.name)
-        kind = node.kind.value.lower()
+        kind = node.type.value.lower()
         self.depth += 1
         body_str = [self.visit(s) for s in node.body]
         if len(node.body) == 1:
@@ -165,11 +165,11 @@ class Latex(ast.ASTVisitor):
                 else:
                     common_parameters.append(symbol)
             elif isinstance(symbol, symboltable.ObjectSymbol):
-                if symbol.kind == ast.ObjectType.ATOM:
+                if symbol.type == ast.ObjectType.ATOM:
                     atoms.append(symbol)
                 else:
                     bonds.append(symbol)
-            elif isinstance(symbol, symboltable.ExprSymbol):
+            elif isinstance(symbol, symboltable.SubstitutionSymbol):
                 expressions.append(symbol)
             elif isinstance(symbol, symboltable.VariableSymbol):
                 pass  # We need only vector q

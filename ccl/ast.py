@@ -5,8 +5,11 @@ from enum import Enum
 
 
 class NoValEnum(Enum):
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{self.__class__.__name__}.{self.name}'
+
+    def __str__(self) -> str:
+        return f'{self.value}'
 
 
 class VarContext(NoValEnum):
@@ -32,27 +35,27 @@ class ParameterType(NoValEnum):
 
 
 class ArrayType:
-    def __init__(self, *indices: ObjectType):
+    def __init__(self, *indices: ObjectType) -> None:
         self.indices: Tuple[ObjectType, ...] = indices
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'ArrayType{self.indices}'
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, ArrayType):
             return False
         return self.indices == other.indices
 
 
 class FunctionType:
-    def __init__(self, return_type: NumericType, *args: Union[ObjectType, NumericType]):
+    def __init__(self, return_type: NumericType, *args: Union[ObjectType, NumericType]) -> None:
         self.args: Tuple[Union[ObjectType, NumericType], ...] = args
         self.return_type: NumericType = return_type
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'FunctionType{self.args} -> {self.return_type}'
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, FunctionType):
             return False
         return self.args == other.args and self.return_type == other.return_type
@@ -121,7 +124,7 @@ class NameGetter:
     def visit(cls, node: ASTNode) -> Set[str]:
         names = set()
         if isinstance(node, Name):
-            names.add(node.name)
+            names.add(node.val)
         for _, value in node:
             if isinstance(value, list):
                 for item in value:
@@ -186,7 +189,7 @@ class Number(Expression):
 class Name(Expression):
     def __init__(self, pos: Tuple[int, int], name: str, ctx: VarContext) -> None:
         super().__init__(pos)
-        self.name: str = name
+        self.val: str = name
         self.ctx: VarContext = ctx
 
 
@@ -274,11 +277,11 @@ class For(Statement):
 
 
 class ForEach(Statement):
-    def __init__(self, pos: Tuple[int, int], name: Name, kind: ObjectType, constraints: Constraint,
+    def __init__(self, pos: Tuple[int, int], name: Name, otype: ObjectType, constraints: Constraint,
                  body: List[Statement]) -> None:
         super().__init__(pos)
         self.name: Name = name
-        self.kind: ObjectType = kind
+        self.type: ObjectType = otype
         self.constraints: Constraint = constraints
         self.body: List[Statement] = body
         self.symbol_table = None
@@ -330,10 +333,10 @@ class Predicate(Constraint):
 
 
 class Parameter(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, kind: ParameterType) -> None:
+    def __init__(self, pos: Tuple[int, int], name: Name, ptype: ParameterType) -> None:
         super().__init__(pos)
         self.name: Name = name
-        self.kind: ParameterType = kind
+        self.type: ParameterType = ptype
 
 
 class Substitution(Annotation):
@@ -346,11 +349,11 @@ class Substitution(Annotation):
 
 
 class Object(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, kind: ObjectType, constraints: Constraint) -> None:
+    def __init__(self, pos: Tuple[int, int], name: Name, otype: ObjectType, constraints: Optional[Constraint]) -> None:
         super().__init__(pos)
         self.name: Name = name
-        self.kind: ObjectType = kind
-        self.constraints: Constraint = constraints
+        self.type: ObjectType = otype
+        self.constraints: Optional[Constraint] = constraints
 
 
 class Property(Annotation):

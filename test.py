@@ -10,12 +10,14 @@ if len(sys.argv) != 2:
 with open(sys.argv[1]) as f:
     data = f.read()
 
+
 print('\n*** CCL ****\n')
 print(data)
 
-print('\n*** Python ***\n')
+
+print('\n*** Translated ****\n')
 try:
-    print(translate(data, 'python'))
+    print(translate(data, 'graphviz', output_dir='/tmp/'))
 except CCLCodeError as e:
     print('\nERROR: ' + str(e.message))
     print(f'\n{e.line:2d}:', data.split('\n')[e.line - 1])

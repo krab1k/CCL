@@ -77,7 +77,7 @@ double {method_name}::{name}({args}) const {{
 }}
 '''
         for symbol in self.symbol_table.symbols.values():
-            if isinstance(symbol, symboltable.ExprSymbol):
+            if isinstance(symbol, symboltable.SubstitutionSymbol):
                 if len(symbol.rules) == 1:
                     names = ast.NameGetter.visit(symbol.rules[None])
                     needed_names = []
@@ -161,7 +161,7 @@ double {method_name}::{name}({args}) const {{
         return node.val
 
     def visit_Name(self, node: ast.Name) -> str:
-        return node.name
+        return node.val
 
     def visit_For(self, node: ast.For) -> str:
         value_from = self.visit_Number(node.value_from)
@@ -188,7 +188,7 @@ double {method_name}::{name}({args}) const {{
         defines = self.define_new_symbols(node.symbol_table)
         self.depth -= 1
         code = '\n'.join(statements)
-        kind = ast.ObjectType(node.kind).value.lower()
+        kind = ast.ObjectType(node.type).value.lower()
         return self.p(f'for(const auto &{name}: molecule.{kind}s()) {{\n{defines}{code}\n') + self.p('}')
 
     def visit_Assign(self, node: ast.Assign) -> str:
@@ -215,23 +215,23 @@ double {method_name}::{name}({args}) const {{
 
     def visit_Subscript(self, node: ast.Subscript) -> str:
         if self.resolving_node is not None:
-            symbol = symboltable.SymbolTable.get_table_for_node(self.resolving_node).resolve(node.name.name)
+            symbol = symboltable.SymbolTable.get_table_for_node(self.resolving_node).resolve(node.name.val)
         else:
-            symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(node.name.name)
+            symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(node.name.val)
         if isinstance(symbol, symboltable.VariableSymbol):
             name = 'q' if symbol.name == 'q' else symbol.name
             indices = ', '.join(f'{self.visit(idx)}.index()' for idx in node.indices)
             return f'{name}[{indices}]'
 
         if isinstance(symbol, symboltable.ParameterSymbol) and symbol.kind == ast.ParameterType.ATOM:
-            return f'parameters_->atom()->parameter(atom::{symbol.name})({node.indices[0].name})'
+            return f'parameters_->atom()->parameter(atom::{symbol.name})({node.indices[0].val})'
 
         if isinstance(symbol, symboltable.ParameterSymbol) and symbol.kind == ast.ParameterType.BOND:
             if len(node.indices) == 1:
-                return f'parameters_->bond()->parameter(bond::{symbol.name})({node.indices[0].name})'
+                return f'parameters_->bond()->parameter(bond::{symbol.name})({node.indices[0].val})'
             else:
                 raise NotImplementedError('Only single indexing implemented')
-        if isinstance(symbol, symboltable.ExprSymbol):
+        if isinstance(symbol, symboltable.SubstitutionSymbol):
             indices = ', '.join(f'{self.visit(idx)}' for idx in node.indices)
             return f'{symbol.name}({indices})'
         if isinstance(symbol, symboltable.FunctionSymbol):
@@ -299,7 +299,7 @@ double {method_name}::{name}({args}) const {{
                     else:
                         needed_names.append(f'double {name}')
                 elif isinstance(symbol, symboltable.ObjectSymbol):
-                    if symbol.kind == ast.ObjectType.ATOM:
+                    if symbol.type == ast.ObjectType.ATOM:
                         needed_names.append(f'const Atom &{name}')
                     else:
                         needed_names.append(f'const Bond &{name}')
