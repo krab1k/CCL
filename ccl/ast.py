@@ -12,34 +12,41 @@ class NoValEnum(Enum):
         return f'{self.value}'
 
 
-class VarContext(NoValEnum):
+class Type:
+    pass
+
+
+class VarContext(Type, NoValEnum):
     LOAD = 'Load'
     STORE = 'Store'
-    ANNOTATION = 'Annotation'
 
 
-class ObjectType(NoValEnum):
+class ObjectType(Type, NoValEnum):
     ATOM = 'Atom'
     BOND = 'Bond'
 
 
-class NumericType(NoValEnum):
+class NumericType(Type, NoValEnum):
     INT = 'Int'
     FLOAT = 'Float'
 
 
-class ParameterType(NoValEnum):
+class ParameterType(Type, NoValEnum):
     ATOM = 'Atom'
     BOND = 'Bond'
     COMMON = 'Common'
 
 
-class ArrayType:
+class ArrayType(Type):
     def __init__(self, *indices: ObjectType) -> None:
         self.indices: Tuple[ObjectType, ...] = indices
 
     def __repr__(self) -> str:
         return f'ArrayType{self.indices}'
+
+    def __str__(self) -> str:
+        args_str = ', '.join(f'{arg}' for arg in self.indices)
+        return f'Array[{args_str}]'
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, ArrayType):
@@ -47,13 +54,17 @@ class ArrayType:
         return self.indices == other.indices
 
 
-class FunctionType:
+class FunctionType(Type):
     def __init__(self, return_type: NumericType, *args: Union[ObjectType, NumericType]) -> None:
         self.args: Tuple[Union[ObjectType, NumericType], ...] = args
         self.return_type: NumericType = return_type
 
     def __repr__(self) -> str:
         return f'FunctionType{self.args} -> {self.return_type}'
+
+    def __str__(self) -> str:
+        args_str = ' x '.join(f'{arg}' for arg in self.args)
+        return f'{args_str} -> {self.return_type}'
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, FunctionType):
@@ -234,9 +245,9 @@ class Subscript(Expression):
 
 
 class Function(Expression):
-    def __init__(self, pos: Tuple[int, int], name: Name, arg: Expression) -> None:
+    def __init__(self, pos: Tuple[int, int], name: str, arg: Expression) -> None:
         super().__init__(pos)
-        self.name: Name = name
+        self.name: str = name
         self.arg: Expression = arg
 
 
@@ -246,11 +257,11 @@ class EE(Expression):
         CUTOFF = 'Cutoff'
         COVER = 'Cover'
 
-    def __init__(self, pos: Tuple[int, int], idx_row: Name, idx_col: Name, diag: Expression, off: Expression,
+    def __init__(self, pos: Tuple[int, int], idx_row: str, idx_col: str, diag: Expression, off: Expression,
                  rhs: Expression, ee_type: 'EE.Type', radius: Optional[NumericType]) -> None:
         super().__init__(pos)
-        self.idx_row: Name = idx_row
-        self.idx_col: Name = idx_col
+        self.idx_row: str = idx_row
+        self.idx_col: str = idx_col
         self.diag: Expression = diag
         self.off: Expression = off
         self.rhs: Expression = rhs
@@ -333,9 +344,9 @@ class Predicate(Constraint):
 
 
 class Parameter(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, ptype: ParameterType) -> None:
+    def __init__(self, pos: Tuple[int, int], name: str, ptype: ParameterType) -> None:
         super().__init__(pos)
-        self.name: Name = name
+        self.name: str = name
         self.type: ParameterType = ptype
 
 
@@ -349,26 +360,26 @@ class Substitution(Annotation):
 
 
 class Object(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, otype: ObjectType, constraints: Optional[Constraint]) -> None:
+    def __init__(self, pos: Tuple[int, int], name: str, otype: ObjectType, constraints: Optional[Constraint]) -> None:
         super().__init__(pos)
-        self.name: Name = name
+        self.name: str = name
         self.type: ObjectType = otype
         self.constraints: Optional[Constraint] = constraints
 
 
 class Property(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, prop: Name) -> None:
+    def __init__(self, pos: Tuple[int, int], name: str, prop: str) -> None:
         super().__init__(pos)
-        self.name: Name = name
-        self.prop: Name = prop
+        self.name: str = name
+        self.prop: str = prop
 
 
 class Constant(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: Name, prop: Name, element: Name) -> None:
+    def __init__(self, pos: Tuple[int, int], name: str, prop: str, element: str) -> None:
         super().__init__(pos)
-        self.name: Name = name
-        self.prop: Name = prop
-        self.element: Name = element
+        self.name: str = name
+        self.prop: str = prop
+        self.element: str = element
 
 
 def is_atom(node: ASTNode) -> bool:

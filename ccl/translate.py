@@ -9,7 +9,8 @@ from ccl.symboltable import SymbolTable
 from ccl.parser import Parser, CCLErrorListener
 
 
-def translate(source: str, output_language: Optional[str] = None, output_dir: Optional[str] = None) -> Optional[str]:
+def translate(source: str, output_language: Optional[str] = None, output_dir: Optional[str] = None, **kwargs) -> \
+                                                                                                        Optional[str]:
     lexer = ccl.antlr.CCLLexer.CCLLexer(antlr4.InputStream(source))
     token_stream = antlr4.CommonTokenStream(lexer)
     parser = ccl.antlr.CCLParser.CCLParser(token_stream)
@@ -31,6 +32,6 @@ def translate(source: str, output_language: Optional[str] = None, output_dir: Op
         except AttributeError:
             raise RuntimeError(f'No such language: {output_language}')
 
-        g = generator(table, output_dir=output_dir)
+        g = generator(table, output_dir=output_dir, **kwargs)
         code = str(g.visit(ast))
         return code

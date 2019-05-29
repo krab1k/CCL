@@ -4,7 +4,7 @@ from typing import Dict, Tuple, Optional, Union
 from abc import ABC, abstractmethod
 
 from ccl import ast
-from ccl.errors import CCLSymbolError
+from ccl.errors import CCLSymbolError, CCLTypeError
 
 
 class Function:
@@ -12,11 +12,15 @@ class Function:
         self.name: str = name
         self.type: ast.FunctionType = fn_type
 
+    def __str__(self) -> str:
+        return f'{self.name}: {self.type}'
+
 
 FUNCTIONS = {}
 
 # Add common math functions
-for fn in ['exp', 'sqrt', 'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh']:
+MATH_FUNCTIONS_NAMES = ['exp', 'sqrt', 'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh']
+for fn in MATH_FUNCTIONS_NAMES:
     FUNCTIONS[fn] = Function(fn, ast.FunctionType(ast.NumericType.FLOAT, ast.NumericType.FLOAT))
 
 # Add atom properties
@@ -160,8 +164,16 @@ class SymbolTable:
 class SymbolTableBuilder(ast.ASTVisitor):
     def __init__(self) -> None:
         super().__init__()
-        self.symbol_table: SymbolTable = SymbolTable(None)
+        self.global_table: SymbolTable = SymbolTable(None)
+        self.symbol_table: SymbolTable = SymbolTable(self.global_table)
         self.current_table: SymbolTable = self.symbol_table
+
+        # Add math function names to the global table
+        for fn_name in MATH_FUNCTIONS_NAMES:
+            self.global_table.define(FunctionSymbol(fn_name, None, FUNCTIONS[fn_name]))
+
+        # q is always a vector of charges
+        self.global_table.define(VariableSymbol('q', None, ast.ArrayType(ast.ObjectType.ATOM, )))
 
     def visit_Method(self, node: ast.Method) -> None:
         node.symbol_table = self.current_table
@@ -172,10 +184,45 @@ class SymbolTableBuilder(ast.ASTVisitor):
             self.visit(statement)
 
     def visit_Parameter(self, node: ast.Parameter) -> None:
-        self.current_table.define(ParameterSymbol(node.name.val, node, node.type))
+        self.current_table.define(ParameterSymbol(node.name, node, node.type))
 
     def visit_Object(self, node: ast.Object) -> None:
-        self.current_table.define(ObjectSymbol(node.name.val, node, node.type, node.constraints))
+        self.current_table.define(ObjectSymbol(node.name, node, node.type, node.constraints))
 
     def visit_Constant(self, node: ast.Constant) -> None:
-        self.current_table.define(ConstantSymbol(node.name.val, node, node.prop.val, node.element.val))
+        self.current_table.define(ConstantSymbol(node.name, node, node.prop, node.element))
+
+    def visit_Property(self, node: ast.Property) -> None:
+        try:
+            f = FUNCTIONS[node.prop]
+        except KeyError:
+            raise CCLSymbolError(node, f'Function {node.prop} is not known.')
+
+        self.current_table.define(FunctionSymbol(node.name, node, f))
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        self.visit(node.rhs)
+        # TODO
+
+    def visit_Function(self, node: ast.Function) -> None:
+        # Functions have only one numerical argument
+        def check_args(expected: ast.Type, given: ast.Type):
+            if expected == given:
+                return True
+            elif given == ast.NumericType.INT and expected == ast.NumericType.FLOAT:
+                return True
+
+            return False
+
+        self.visit(node.arg)
+
+        try:
+            f = FUNCTIONS[node.name]
+        except KeyError:
+            raise CCLSymbolError(node, f'Function {node.name} is not known.')
+
+        if not check_args(f.type.args[0], node.arg.result_type):
+            raise CCLTypeError(node.arg, f'Incompatible argument type for function {f.name}. '
+                                         f'Got {node.arg.result_type}, expected {f.type.args[0]}')
+
+        node.result_type = f.type.return_type

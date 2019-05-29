@@ -52,18 +52,16 @@ class Parser(CCLVisitor):
         return method
 
     def visitParameterAnnotation(self, ctx: CCLParser.ParameterAnnotationContext) -> ast.Parameter:
-        name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
         ptype = ast.ParameterType(ctx.ptype.text.capitalize())
-        return ast.Parameter(self.get_pos(ctx), name, ptype)
+        return ast.Parameter(self.get_pos(ctx), ctx.name.text, ptype)
 
     def visitObjectAnnotation(self, ctx: CCLParser.ObjectAnnotationContext) -> ast.Object:
-        name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
         object_type = ast.ObjectType(ctx.objtype.text.capitalize())
         if ctx.constraint():
             constraint = self.visit(ctx.constraint())
         else:
             constraint = None
-        return ast.Object(self.get_pos(ctx), name, object_type, constraint)
+        return ast.Object(self.get_pos(ctx), ctx.name.text, object_type, constraint)
 
     def visitAndOrConstraint(self, ctx: CCLParser.AndOrConstraintContext) -> ast.BinaryLogicalOp:
         lhs = self.visit(ctx.left)
@@ -171,26 +169,18 @@ class Parser(CCLVisitor):
         return ast.ForEach(self.get_pos(ctx), name, object_type, constraint, body)
 
     def visitPropertyAnnotation(self, ctx: CCLParser.PropertyAnnotationContext) -> ast.Property:
-        name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
         names = ' '.join(name.text for name in ctx.ptype)
-        prop = ast.Name(self.get_pos(ctx.ptype[0]), names, ast.VarContext.ANNOTATION)
-        return ast.Property(self.get_pos(ctx), name, prop)
+        return ast.Property(self.get_pos(ctx), ctx.name.text, names)
 
     def visitConstantAnnotation(self, ctx: CCLParser.ConstantAnnotationContext) -> ast.Constant:
-        name = ast.Name(self.get_pos(ctx.name), ctx.name.text, ast.VarContext.ANNOTATION)
         names = ' '.join(name.text for name in ctx.ptype)
-        prop = ast.Name(self.get_pos(ctx.ptype[0]), names, ast.VarContext.ANNOTATION)
-        element = ast.Name(self.get_pos(ctx.element), ctx.element.text, ast.VarContext.ANNOTATION)
-        return ast.Constant(self.get_pos(ctx), name, prop, element)
+        return ast.Constant(self.get_pos(ctx), ctx.name.text, names, ctx.element.text)
 
     def visitFnExpr(self, ctx: CCLParser.FnExprContext) -> ast.Function:
-        name = ast.Name(self.get_pos(ctx.fn), ctx.fn.text, ast.VarContext.ANNOTATION)
         arg = self.visit(ctx.fn_arg)
-        return ast.Function(self.get_pos(ctx), name, arg)
+        return ast.Function(self.get_pos(ctx), ctx.fn.text, arg)
 
     def visitEEExpr(self, ctx: CCLParser.EEExprContext) -> ast.EE:
-        idx_row = ast.Name(self.get_pos(ctx.idx_row), ctx.idx_row.text, ast.VarContext.ANNOTATION)
-        idx_col = ast.Name(self.get_pos(ctx.idx_col), ctx.idx_col.text, ast.VarContext.ANNOTATION)
         diag = self.visit(ctx.diag)
         off = self.visit(ctx.off)
         rhs = self.visit(ctx.rhs)
@@ -201,4 +191,4 @@ class Parser(CCLVisitor):
             ee_type = ast.EE.Type.FULL
             radius = None
 
-        return ast.EE(self.get_pos(ctx), idx_row, idx_col, diag, off, rhs, ee_type, radius)
+        return ast.EE(self.get_pos(ctx), ctx.idx_row.text, ctx.idx_col.text, diag, off, rhs, ee_type, radius)

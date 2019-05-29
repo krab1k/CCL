@@ -17,7 +17,7 @@ class GraphNode:
         self.properties: List[str] = []
 
     def __str__(self) -> str:
-        property_string = '<br/>'.join(prop for prop in self.properties if not prop.startswith('_'))
+        property_string = '<br/>'.join(prop for prop in self.properties if not prop.startswith('_') or prop == '_result_type')
         return f'node{self.idx} [label = < <b>{self.node_type}</b><br/> {property_string} >]'
 
 
@@ -31,7 +31,7 @@ class SymbolTableNode:
 
     def __str__(self) -> str:
         symbols_string = '<br/>'.join(self.symbols)
-        return f'node{self.idx} [label = < <b> SymbolTable </b><br/> {symbols_string} >]'
+        return f'node{self.idx} [shape = note label = < <b> SymbolTable </b><br/> {symbols_string} >]'
 
 
 class Graphviz(ast.ASTVisitor):
@@ -42,7 +42,17 @@ class Graphviz(ast.ASTVisitor):
         gn = GraphNode(0, 'Method')
         self.nodes.append(gn)
         self.current_node: GraphNode = gn
-        self.symboltable: symboltable.SymbolTable = table
+
+        self.symbol_table: symboltable.SymbolTable = table
+        self.curret_table_node: SymbolTableNode = SymbolTableNode(len(self.nodes) + 1, table.parent.symbols)
+        self.nodes.append(self.curret_table_node)
+
+        self.annotate_results: bool = False
+        try:
+            if kwargs['annotate_results']:
+                self.annotate_results = True
+        except KeyError:
+            pass
 
     def _visit(self, field: str, node: ast.ASTNode) -> None:
         gn = GraphNode(len(self.nodes) + 1, node.__class__.__name__)
@@ -51,12 +61,16 @@ class Graphviz(ast.ASTVisitor):
         old = self.current_node
         self.current_node = gn
         self.visit(node)
+        if self.annotate_results:
+            if isinstance(node, ast.Expression):
+                self.current_node.properties.append(f'<font color="red"> result_type = {node.result_type}</font>')
         self.current_node = old
 
     def print_symbol_table(self, table: symboltable.SymbolTable):
         gn = SymbolTableNode(len(self.nodes) + 1, table.symbols)
         self.nodes.append(gn)
         self.edges.append(f'node{self.current_node.idx} -> node{gn.idx}')
+        self.edges.append(f'node{gn.idx} -> node{self.curret_table_node.idx}')
 
     def generic_visit(self, node: ast.ASTNode) -> None:
         for field, value in node:
@@ -81,4 +95,4 @@ class Graphviz(ast.ASTVisitor):
         for item in itertools.chain(self.nodes, self.edges):
             data += f'{item}\n'
 
-        return f'digraph G {{\nnode [shape=rectangle]\n{data}}}'
+        return f'digraph G {{\nnode [shape = rectangle]\n{data}}}'

@@ -17,7 +17,7 @@ print(data)
 
 print('\n*** Translated ****\n')
 try:
-    print(translate(data, 'graphviz', output_dir='/tmp/'))
+    print(translate(data, 'graphviz', output_dir='/tmp/', annotate_results=True))
 except CCLCodeError as e:
     print('\nERROR: ' + str(e.message))
     print(f'\n{e.line:2d}:', data.split('\n')[e.line - 1])
