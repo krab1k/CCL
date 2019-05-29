@@ -1,19 +1,12 @@
-name mgc
+name new
+a = exp(1)
 
-for each atom i:
-X0[i] = E[i]
-done
-
-S = -A + D + I
-X = solve(S, X0)
-
-Xm = sum[j](X[j]) ** (1 / n)
-
-q = (X - X0) / Xm
+# q = EE[i, j](B[i], k / R[i, j], A[i], cover 12)
 
 where
-A is connectivity matrix
-D is degree matrix
-I is identity matrix
-E is electronegativity
-j is atom
+A is atom parameter
+B is atom parameter
+k is common parameter
+p is electronegativity
+c is atom
+d is electronegativity of hydrogen
