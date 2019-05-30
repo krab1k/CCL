@@ -46,7 +46,7 @@ class ArrayType(Type):
 
     def __str__(self) -> str:
         args_str = ', '.join(f'{arg}' for arg in self.indices)
-        return f'Array[{args_str}]'
+        return f'Float[{args_str}]'
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, ArrayType):

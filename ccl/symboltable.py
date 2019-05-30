@@ -200,9 +200,46 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         self.current_table.define(FunctionSymbol(node.name, node, f))
 
+    def visit_Name(self, node: ast.Name) -> None:
+        s = self.current_table.resolve(node.val)
+        if s is not None:
+            node.result_type = s.symbol_type()
+        else:
+            raise CCLSymbolError(node, f'Symbol {node.val} not defined.')
+
     def visit_Assign(self, node: ast.Assign) -> None:
+        def check_types(lhs: ast.Type, rhs: ast.Type):
+            if isinstance(lhs, ast.ArrayType) and isinstance(rhs, ast.ArrayType):
+                return lhs == rhs
+            # Can assign number to all elements of the vector/matrix
+            if isinstance(lhs, ast.ArrayType) and isinstance(rhs, ast.NumericType):
+                return True
+            if isinstance(lhs, ast.NumericType) and isinstance(rhs, ast.NumericType):
+                # Cannot assign Float to Int, OK otherwise
+                if lhs == ast.NumericType.INT and rhs == ast.NumericType.FLOAT:
+                    return False
+                else:
+                    return True
+
+            return False
+
         self.visit(node.rhs)
-        # TODO
+        rtype = node.rhs.result_type
+        if isinstance(node.lhs, ast.Name):
+            s = self.current_table.resolve(node.lhs.val)
+            if s is not None:
+                if check_types(s.symbol_type(), rtype):
+                    node.lhs.result_type = s.symbol_type()
+                else:
+                    raise CCLTypeError(node,
+                                       f'Cannot assign {rtype} to the variable {s.name} of type {s.symbol_type()}.')
+            else:
+                # New symbols are defined at method scope
+                self.symbol_table.define(VariableSymbol(node.lhs.val, node, rtype))
+                node.lhs.result_type = rtype
+        else:  # ast.Subscript
+            # TODO
+            pass
 
     def visit_Function(self, node: ast.Function) -> None:
         # Functions have only one numerical argument
@@ -226,3 +263,63 @@ class SymbolTableBuilder(ast.ASTVisitor):
                                          f'Got {node.arg.result_type}, expected {f.type.args[0]}')
 
         node.result_type = f.type.return_type
+
+    def visit_BinaryOp(self, node: ast.BinaryOp) -> None:
+        self.visit(node.left)
+        self.visit(node.right)
+        ltype = node.left.result_type
+        rtype = node.right.result_type
+
+        if isinstance(ltype, ast.NumericType) and isinstance(rtype, ast.NumericType):
+            if ltype == ast.NumericType.FLOAT or rtype == ast.NumericType.FLOAT:
+                node.result_type = ast.NumericType.FLOAT
+            else:
+                node.result_type = ast.NumericType.INT
+        elif isinstance(ltype, ast.ArrayType) and isinstance(rtype, ast.ArrayType):
+            if node.op in (ast.BinaryOp.Ops.ADD, ast.BinaryOp.Ops.SUB):
+                if ltype.indices == rtype.indices:
+                    node.result_type = ltype
+                else:
+                    raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
+            else:
+                raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
+        #  One is Array, second Number
+        elif isinstance(ltype, (ast.ArrayType, ast.NumericType)) and isinstance(rtype, (ast.ArrayType, ast.NumericType)):
+            if isinstance(ltype, ast.ArrayType):
+                node.result_type = ltype
+            else:
+                node.result_type = rtype
+        else:
+            raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
+
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> None:
+        self.visit(node.expr)
+        node.result_type = node.expr.result_type
+
+    def visit_For(self, node: ast.For) -> None:
+        s = self.current_table.resolve(node.name.val)
+        if s is not None:
+            raise CCLSymbolError(node.name, f'Symbol {node.name.val} already defined.')
+
+        table = SymbolTable(self.current_table)
+        node.symbol_table = table
+        table.define(VariableSymbol(node.name.val, node, ast.NumericType.INT))
+        self.current_table = table
+        for statement in node.body:
+            self.visit(statement)
+
+        self.current_table = self.current_table.parent
+
+    def visit_ForEach(self, node: ast.ForEach) -> None:
+        s = self.current_table.resolve(node.name.val)
+        if s is not None:
+            raise CCLSymbolError(node.name, f'Symbol {node.name.val} already defined.')
+
+        table = SymbolTable(self.current_table)
+        node.symbol_table = table
+        table.define(ObjectSymbol(node.name.val, node, node.type, node.constraints))
+        self.current_table = table
+        for statement in node.body:
+            self.visit(statement)
+
+        self.current_table = self.current_table.parent
