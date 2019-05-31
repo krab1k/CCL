@@ -1,3 +1,4 @@
+name gdac
 for alpha = 0 to 10:
     for each atom i:
         chi[i] = q[i] * A[i] + B[i]
@@ -6,13 +7,13 @@ for alpha = 0 to 10:
     for each atom i:
         q[i] = q[i] + sum[j]((chi[j] - chi[i]) / d[i] * f[i, j] ^ alpha) + sum[k]((chi[k] - chi[i]) / d[k] * f[i, k] ^ alpha)
     done
-
 done
 
 where
 A is atom parameter
 B is atom parameter
-r is vdwradius
+r is van der waals radius
+R is distance
 f[i, j] = 1 - R[i, j] / (r[i] + r[j])
 j is atom such that bonded(i, j) and chi[j] > chi[i]
 k is atom such that bonded(i, k) and chi[k] < chi[i]

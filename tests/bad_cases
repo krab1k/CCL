@@ -1,10 +1,8 @@
 # Cannot assign number to vector
-
 q = 1
 
 ===
 # For each has to have a object type specifier
-
 for each i:
     x[i] = 1
 done
@@ -16,5 +14,12 @@ for i = 0 to 5:
     a = 1
 done
 a = i
+
+===
+# Cannot change for loop variable
+
+for i = 0 to 5:
+    i = 1
+done
 
 ===

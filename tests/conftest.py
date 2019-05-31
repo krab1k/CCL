@@ -10,18 +10,18 @@ def pytest_generate_tests(metafunc):
             data = f.readlines()
 
         methods = {}
-        method = ''
+        method_src = ''
         name = ''
         for line in data:
             if not line.strip():
                 continue
             elif line.startswith('#'):
-                name = line[2:]
+                name = line[2:].strip()
                 continue
             elif line.strip() == '===':
-                methods[name] = method
-                method = ''
+                methods[name] = method_src
+                method_src = 'name bad\n'
             else:
-                method += line
+                method_src += line
 
         metafunc.parametrize('example', methods.items())
