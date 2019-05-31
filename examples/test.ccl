@@ -1,12 +1,5 @@
-name new
-a = exp(1)
+name bad
 
-# q = EE[i, j](B[i], k / R[i, j], A[i], cover 12)
-
-where
-A is atom parameter
-B is atom parameter
-k is common parameter
-p is electronegativity
-c is atom
-d is electronegativity of hydrogen
+for i = 0 to 5:
+    i = 1
+done

@@ -1,8 +1,9 @@
 name eem
 
-q = EE[i, j](-A[i], B[i], 1 / R[i, j])
+q = EE[i, j](B[i], 1 / R[i, j], -A[i])
 
 where
 
 A is atom parameter
 B is atom parameter
+R is distance

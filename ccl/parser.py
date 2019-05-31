@@ -52,7 +52,7 @@ class Parser(CCLVisitor):
         return method
 
     def visitParameterAnnotation(self, ctx: CCLParser.ParameterAnnotationContext) -> ast.Parameter:
-        ptype = ast.ParameterType(ctx.ptype.text.capitalize())
+        ptype = ast.ParameterType(ctx.ptype.text.capitalize() + ' Parameter')
         return ast.Parameter(self.get_pos(ctx), ctx.name.text, ptype)
 
     def visitObjectAnnotation(self, ctx: CCLParser.ObjectAnnotationContext) -> ast.Object:

@@ -74,7 +74,8 @@ class Graphviz(ast.ASTVisitor):
 
         if self.annotate_results:
             if isinstance(node, ast.Expression):
-                self.current_node.properties.append(f'<font color="red"> result_type = {node.result_type}</font>')
+                self.current_node.properties.append(f'<font color="red"> result_type ='
+                                                    f'{html.escape(str(node.result_type))}</font>')
         self.current_node = old
 
         return gn

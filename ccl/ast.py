@@ -32,9 +32,9 @@ class NumericType(Type, NoValEnum):
 
 
 class ParameterType(Type, NoValEnum):
-    ATOM = 'Atom'
-    BOND = 'Bond'
-    COMMON = 'Common'
+    ATOM = 'Atom Parameter'
+    BOND = 'Bond Parameter'
+    COMMON = 'Common Parameter'
 
 
 class ArrayType(Type):
@@ -182,11 +182,11 @@ class Expression(ASTNode):
         self._result_type: Optional[Union[NumericType, ParameterType, ObjectType]] = None
 
     @property
-    def result_type(self) -> Union[NumericType, ParameterType, ObjectType]:
+    def result_type(self) -> Union[NumericType, ParameterType, ObjectType, FunctionType]:
         return self._result_type
 
     @result_type.setter
-    def result_type(self, value: Union[NumericType, ParameterType, ObjectType]) -> None:
+    def result_type(self, value: Union[NumericType, ParameterType, ObjectType, FunctionType]) -> None:
         self._result_type = value
 
 

@@ -1,6 +1,6 @@
 """CCC's implementation of a symbol table"""
 
-from typing import Dict, Tuple, Optional, Union
+from typing import Dict, Tuple, Optional, Union, Set
 from abc import ABC, abstractmethod
 
 from ccl import ast
@@ -29,7 +29,7 @@ for prop in ['electronegativity', 'covalent radius', 'van der waals radius', 'ha
     FUNCTIONS[prop] = Function(prop, ast.FunctionType(ast.NumericType.FLOAT, ast.ObjectType.ATOM))
 
 # Add custom functions
-
+FUNCTIONS['formal charge'] = Function('formal charge', ast.FunctionType(ast.NumericType.INT, ast.ObjectType.ATOM))
 FUNCTIONS['distance'] = Function('distance',
                                  ast.FunctionType(ast.NumericType.FLOAT, ast.ObjectType.ATOM, ast.ObjectType.ATOM))
 
@@ -168,6 +168,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
         self.symbol_table: SymbolTable = SymbolTable(self.global_table)
         self.current_table: SymbolTable = self.symbol_table
 
+        self._iterating_over: Set[str] = set()
+
         # Add math function names to the global table
         for fn_name in MATH_FUNCTIONS_NAMES:
             self.global_table.define(FunctionSymbol(fn_name, None, FUNCTIONS[fn_name]))
@@ -207,6 +209,41 @@ class SymbolTableBuilder(ast.ASTVisitor):
         else:
             raise CCLSymbolError(node, f'Symbol {node.val} not defined.')
 
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        self.visit(node.name)
+        s = self.current_table.resolve(node.name.val)
+        symbol_type = node.name.result_type
+
+        index_types = []
+        for idx in node.indices:
+            self.visit(idx)
+            index_types.append(idx.result_type)
+            if isinstance(idx.result_type, ast.ObjectType) and idx.val not in self._iterating_over:
+                raise CCLSymbolError(idx, f'Object {idx.val} not bound to any For/ForEach/Sum.')
+        index_types = tuple(index_types)
+        index_types_str = ', '.join(str(i) for i in index_types)
+
+        if isinstance(symbol_type, ast.ParameterType):
+            if symbol_type == ast.ParameterType.ATOM and index_types != (ast.ObjectType.ATOM,) or \
+               symbol_type == ast.ParameterType.BOND and index_types != (ast.ObjectType.BOND,):
+                raise CCLTypeError(node, f'Cannot index parameter symbol of type {symbol_type} with {index_types_str}.')
+        elif isinstance(symbol_type, ast.ArrayType):
+            if symbol_type.indices != index_types:
+                raise CCLTypeError(node, f'Cannot index Array of type {symbol_type} '
+                                         f'using index/indices of type(s) {index_types_str}.')
+        elif isinstance(symbol_type, ast.FunctionType):
+            if symbol_type.args != index_types:
+                raise CCLTypeError(node, f'Cannot use function {s.function.name}: {s.function.type} '
+                                         f'with arguments of type(s) {index_types_str}')
+
+            node.result_type = s.function.type.return_type
+            return
+        else:
+            raise CCLTypeError(node, f'Cannot index type {symbol_type} with indices of type(s) {index_types_str}')
+
+        # Return Float if not assigned already
+        node.result_type = ast.NumericType.FLOAT
+
     def visit_Assign(self, node: ast.Assign) -> None:
         def check_types(lhs: ast.Type, rhs: ast.Type):
             if isinstance(lhs, ast.ArrayType) and isinstance(rhs, ast.ArrayType):
@@ -225,9 +262,13 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         self.visit(node.rhs)
         rtype = node.rhs.result_type
+        if not isinstance(rtype, (ast.NumericType, ast.ArrayType)):
+            raise CCLTypeError(node.rhs, f'Only Numbers and Arrays can be assigned not {rtype}.')
         if isinstance(node.lhs, ast.Name):
             s = self.current_table.resolve(node.lhs.val)
             if s is not None:
+                if s.name in self._iterating_over:
+                    raise CCLTypeError(node, f'Cannot assign to loop variable {s.name}.')
                 if check_types(s.symbol_type(), rtype):
                     node.lhs.result_type = s.symbol_type()
                 else:
@@ -237,9 +278,22 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 # New symbols are defined at method scope
                 self.symbol_table.define(VariableSymbol(node.lhs.val, node, rtype))
                 node.lhs.result_type = rtype
-        else:  # ast.Subscript
-            # TODO
-            pass
+        elif isinstance(node.lhs, ast.Subscript):  # ast.Subscript
+            s = self.current_table.resolve(node.lhs.name.val)
+            if s is not None:
+                # Check whether indices are correct
+                if not isinstance(s.symbol_type(), ast.ArrayType):
+                    raise CCLTypeError(node.lhs, f'Cannot assign to non Array type {s.symbol_type()}.')
+                index_types = []
+                for idx in node.lhs.indices:
+                    self.visit(idx)
+                    index_types.append(idx.result_type)
+                if s.symbol_type().indices != tuple(index_types):
+                    indices_str = ', '.join(str(i) for i in index_types)
+                    raise CCLTypeError(node.lhs, f'Cannot index Array of type {s.symbol_type()} '
+                                                 f'using index/indices of type(s) {indices_str}.')
+        else:
+            raise Exception('Should not get here!')
 
     def visit_Function(self, node: ast.Function) -> None:
         # Functions have only one numerical argument
@@ -301,6 +355,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         if s is not None:
             raise CCLSymbolError(node.name, f'Symbol {node.name.val} already defined.')
 
+        self._iterating_over.add(node.name.val)
         table = SymbolTable(self.current_table)
         node.symbol_table = table
         table.define(VariableSymbol(node.name.val, node, ast.NumericType.INT))
@@ -308,6 +363,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         for statement in node.body:
             self.visit(statement)
 
+        self._iterating_over.remove(node.name.val)
         self.current_table = self.current_table.parent
 
     def visit_ForEach(self, node: ast.ForEach) -> None:
@@ -315,6 +371,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         if s is not None:
             raise CCLSymbolError(node.name, f'Symbol {node.name.val} already defined.')
 
+        self._iterating_over.add(node.name.val)
         table = SymbolTable(self.current_table)
         node.symbol_table = table
         table.define(ObjectSymbol(node.name.val, node, node.type, node.constraints))
@@ -322,4 +379,42 @@ class SymbolTableBuilder(ast.ASTVisitor):
         for statement in node.body:
             self.visit(statement)
 
+        self._iterating_over.remove(node.name.val)
         self.current_table = self.current_table.parent
+
+    def visit_Sum(self, node: ast.Sum) -> None:
+        s = self.current_table.resolve(node.name.val)
+        if s is None:
+            raise CCLSymbolError(node.name, f'Symbol {node.name.val} not defined.')
+
+        if not isinstance(s.symbol_type(), ast.ObjectType):
+            raise CCLSymbolError(node.name, f'Sum has to iterate over Atom or Bond not {s.symbol_type()}.')
+
+        self._iterating_over.add(node.name.val)
+        self.visit(node.expr)
+        self._iterating_over.remove(node.name.val)
+        node.result_type = node.expr.result_type
+
+    def visit_EE(self, node: ast.EE) -> None:
+        s1 = self.current_table.resolve(node.idx_row)
+        s2 = self.current_table.resolve(node.idx_col)
+        if s1 is not None or s2 is not None:
+            raise CCLSymbolError(node, 'Index/indices for EE expression already defined.')
+
+        table = SymbolTable(self.current_table)
+        table.define(ObjectSymbol(node.idx_row, node, ast.ObjectType.ATOM, None))
+        table.define(ObjectSymbol(node.idx_col, node, ast.ObjectType.ATOM, None))
+
+        self._iterating_over |= {node.idx_row, node.idx_col}
+        self.current_table = table
+        self.visit(node.diag)
+        self.visit(node.off)
+        self.visit(node.rhs)
+
+        if {node.diag.result_type, node.off.result_type, node.rhs.result_type} != {ast.NumericType.FLOAT}:
+            raise CCLTypeError(node, f'EE expression has to have all parts with Float type.')
+
+        self._iterating_over -= {node.idx_row, node.idx_col}
+        self.current_table = self.current_table.parent
+
+        node.result_type = ast.ArrayType(ast.ObjectType.ATOM)

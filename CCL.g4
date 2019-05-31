@@ -44,7 +44,7 @@ number: NUMBER;
 fragment NL: '\r'? '\n';
 fragment DIGIT: [0-9];
 fragment LETTER: [a-zA-Z];
-fragment ALPHA: DIGIT | LETTER;
+fragment ALPHA: DIGIT | LETTER | '_';
 
 COMMENT: '#' .*? NL -> skip;
 WS: [ \t\n] -> channel(HIDDEN);
