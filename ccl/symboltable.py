@@ -274,7 +274,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         if isinstance(s, ParameterSymbol):
             if symbol_type == ast.ParameterType.ATOM and index_types != (ast.ObjectType.ATOM,) or \
-                    symbol_type == ast.ParameterType.BOND and index_types != (ast.ObjectType.BOND,):
+               (symbol_type == ast.ParameterType.BOND and
+                    index_types not in [(ast.ObjectType.BOND,), (ast.ObjectType.ATOM, ast.ObjectType.ATOM)]):
                 raise CCLTypeError(node, f'Cannot index parameter symbol of type {symbol_type} with {index_types_str}.')
         elif isinstance(s, VariableSymbol) and isinstance(symbol_type, ast.ArrayType):
             if symbol_type.indices != index_types:
