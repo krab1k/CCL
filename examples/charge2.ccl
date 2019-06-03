@@ -3,7 +3,7 @@ name charge2
 for each atom i:
     alpha = sum[j]((E[j] - E[i]) / a[i])
     beta =  sum[k]((E[k] - Eh) * P[i] / b[i])
-    gamma = sum[l]((E[k] - Eh) * P[i] / b[i] / c[i])
+    gamma = sum[l]((E[l] - Eh) * P[i] / b[i] / c[i])
     q[i] = alpha + beta + gamma
 done
 
@@ -13,10 +13,10 @@ Eh is electronegativity of hydrogen
 a is atom parameter
 b is atom parameter
 c is atom parameter
-P is atom parameter
+p is atom parameter
 alpha is common parameter
 j is atom such that bonded(j, i)
 k is atom such that bond_distance(k, i, 2)
 l is atom such that bond_distance(l, i, 3)
 q0 is formal charge
-P[i] = P[i] * (1 + alpha * (q0 - q[i]))
+P[i] = p[i] * (1 + alpha * (q0[i] - q[i]))

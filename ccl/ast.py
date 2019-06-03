@@ -16,6 +16,16 @@ class Type:
     pass
 
 
+class StringType(Type):
+    def __repr__(self):
+        return 'String'
+
+
+class BoolType(Type):
+    def __repr__(self):
+        return 'Bool'
+
+
 class VarContext(Type, NoValEnum):
     LOAD = 'Load'
     STORE = 'Store'
@@ -55,9 +65,10 @@ class ArrayType(Type):
 
 
 class FunctionType(Type):
-    def __init__(self, return_type: NumericType, *args: Union[ObjectType, NumericType]) -> None:
-        self.args: Tuple[Union[ObjectType, NumericType], ...] = args
-        self.return_type: NumericType = return_type
+    def __init__(self, return_type: Union[BoolType, NumericType, ArrayType],
+                 *args: Union[ObjectType, NumericType, ArrayType, StringType]) -> None:
+        self.args: Tuple[Union[ObjectType, NumericType, ArrayType], ...] = args
+        self.return_type: Union[BoolType, NumericType, ArrayType] = return_type
 
     def __repr__(self) -> str:
         return f'FunctionType{self.args} -> {self.return_type}'
@@ -70,6 +81,14 @@ class FunctionType(Type):
         if not isinstance(other, FunctionType):
             return False
         return self.args == other.args and self.return_type == other.return_type
+
+
+class PredicateType(FunctionType):
+    def __init__(self, *args: Union[ObjectType, NumericType, StringType]):
+        super().__init__(BoolType(), *args)
+
+    def __repr__(self):
+        return f'PredicateType{self.args} -> Bool'
 
 
 class ASTNode:

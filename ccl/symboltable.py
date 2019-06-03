@@ -23,15 +23,32 @@ MATH_FUNCTIONS_NAMES = ['exp', 'sqrt', 'sin', 'cos', 'tan', 'sinh', 'cosh', 'tan
 for fn in MATH_FUNCTIONS_NAMES:
     FUNCTIONS[fn] = Function(fn, ast.FunctionType(ast.NumericType.FLOAT, ast.NumericType.FLOAT))
 
+FUNCTIONS['inv'] = Function('inv', ast.FunctionType(ast.ArrayType(ast.ObjectType.ATOM, ast.ObjectType.ATOM),
+                                                    ast.ArrayType(ast.ObjectType.ATOM, ast.ObjectType.ATOM)))
+
 # Add atom properties
 for prop in ['electronegativity', 'covalent radius', 'van der waals radius', 'hardness', 'ionization potential',
              'electron affinity']:
     FUNCTIONS[prop] = Function(prop, ast.FunctionType(ast.NumericType.FLOAT, ast.ObjectType.ATOM))
 
+for prop in ['atomic number', 'valence electron count']:
+    FUNCTIONS[prop] = Function(prop, ast.FunctionType(ast.NumericType.INT, ast.ObjectType.ATOM))
+
+
 # Add custom functions
 FUNCTIONS['formal charge'] = Function('formal charge', ast.FunctionType(ast.NumericType.INT, ast.ObjectType.ATOM))
 FUNCTIONS['distance'] = Function('distance',
                                  ast.FunctionType(ast.NumericType.FLOAT, ast.ObjectType.ATOM, ast.ObjectType.ATOM))
+
+PREDICATES = {'element': Function('element', ast.PredicateType(ast.ObjectType.ATOM, ast.StringType())),
+              'bonded': Function('bonded', ast.PredicateType(ast.ObjectType.ATOM, ast.ObjectType.ATOM)),
+              'near': Function('near',
+                               ast.PredicateType(ast.ObjectType.ATOM, ast.ObjectType.ATOM, ast.NumericType.FLOAT)),
+              'bond_distance': Function('bond_distance',
+                                        ast.PredicateType(ast.ObjectType.ATOM, ast.ObjectType.ATOM,
+                                                          ast.NumericType.INT))}
+
+# TODO Sum functions (inv, distance,..) may use something like ObjectType.ANY
 
 
 class Symbol(ABC):
@@ -114,16 +131,16 @@ class SubstitutionSymbol(Symbol):
 
 
 class ConstantSymbol(Symbol):
-    def __init__(self, name: str, def_node: ast.ASTNode, property: str, element: str):
+    def __init__(self, name: str, def_node: ast.ASTNode, f: Function, element: str):
         super().__init__(name, def_node)
-        self.property: str = property
+        self.property: Function = f
         self.element: str = element
 
     def __repr__(self) -> str:
         return f'ConstantSymbol({self.name}, {self.property}, {self.element})'
 
     def symbol_type(self) -> ast.NumericType:
-        return ast.NumericType.FLOAT
+        return self.property.type.return_type
 
 
 class SymbolTable:
@@ -197,7 +214,15 @@ class SymbolTableBuilder(ast.ASTVisitor):
         self.current_table.define(ObjectSymbol(node.name, node, node.type, node.constraints))
 
     def visit_Constant(self, node: ast.Constant) -> None:
-        self.current_table.define(ConstantSymbol(node.name, node, node.prop, node.element))
+        try:
+            f = FUNCTIONS[node.prop]
+        except KeyError:
+            raise CCLSymbolError(node, f'Property {node.prop} is not known.')
+
+        if len(f.type.args) != 1 or f.type.args[0] != ast.ObjectType.ATOM:
+            raise CCLTypeError(node, f'Function {node.prop} is not a property')
+
+        self.current_table.define(ConstantSymbol(node.name, node, f, node.element))
 
     def visit_Property(self, node: ast.Property) -> None:
         try:
@@ -237,7 +262,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         if isinstance(s, ParameterSymbol):
             if symbol_type == ast.ParameterType.ATOM and index_types != (ast.ObjectType.ATOM,) or \
-               symbol_type == ast.ParameterType.BOND and index_types != (ast.ObjectType.BOND,):
+                    symbol_type == ast.ParameterType.BOND and index_types != (ast.ObjectType.BOND,):
                 raise CCLTypeError(node, f'Cannot index parameter symbol of type {symbol_type} with {index_types_str}.')
         elif isinstance(s, VariableSymbol) and isinstance(symbol_type, ast.ArrayType):
             if symbol_type.indices != index_types:
@@ -436,10 +461,15 @@ class SymbolTableBuilder(ast.ASTVisitor):
         if s is None:
             raise CCLSymbolError(node.name, f'Symbol {node.name.val} not defined.')
 
-        if not isinstance(s.symbol_type(), ast.ObjectType):
+        node.name.result_type = s.symbol_type()
+
+        if not isinstance(s, ObjectSymbol):
             raise CCLSymbolError(node.name, f'Sum has to iterate over Atom or Bond not {s.symbol_type()}.')
 
         self._iterating_over.add(node.name.val)
+        if s.constraints is not None:
+            self.visit(s.constraints)
+
         self.visit(node.expr)
         self._iterating_over.remove(node.name.val)
         node.result_type = node.expr.result_type
@@ -494,4 +524,26 @@ class SymbolTableBuilder(ast.ASTVisitor):
             s.rules[node.constraints] = node.rhs
 
     def visit_Predicate(self, node: ast.Predicate) -> None:
-        pass
+        try:
+            f = PREDICATES[node.name]
+        except KeyError:
+            raise CCLSymbolError(node, f'Predicate {node.name} not defined.')
+
+        if len(f.type.args) != len(node.args):
+            raise CCLSymbolError(node, f'Predicate {f.name} should have {len(f.type.args)} arguments '
+                                       f'but got {len(node.args)}')
+
+        for arg_type, arg in zip(f.type.args, node.args):
+            if isinstance(arg_type, ast.ObjectType):
+                self.visit(arg)
+                if arg.result_type != arg_type:
+                    raise CCLTypeError(arg, f'Predicate\'s {node.name} argument is not {arg_type}')
+            elif isinstance(arg_type, ast.StringType):
+                # Note that name would not have result_type set as it's really a String
+                if not isinstance(arg, ast.Name):
+                    raise CCLTypeError(arg, f'Predicate {node.name} expected string argument')
+            elif isinstance(arg_type, ast.NumericType):
+                if not isinstance(arg.result_type, ast.NumericType):
+                    raise CCLTypeError(arg, f'Predicate {node.name} expected numeric argument.')
+            else:
+                raise Exception('We should not get here!')
