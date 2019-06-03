@@ -211,6 +211,15 @@ class SymbolTableBuilder(ast.ASTVisitor):
         self.current_table.define(ParameterSymbol(node.name, node, node.type))
 
     def visit_Object(self, node: ast.Object) -> None:
+        if node.atom_indices is not None:
+            i1, i2 = node.atom_indices
+            s1 = self.current_table.resolve(i1)
+            s2 = self.current_table.resolve(i2)
+            if s1 is not None or s2 is not None:
+                raise CCLSymbolError(node, f'Decomposition of bond symbol {node.name} used already defined names.')
+
+            self.current_table.define(ObjectSymbol(i1, node, ast.ObjectType.ATOM, None))
+            self.current_table.define(ObjectSymbol(i2, node, ast.ObjectType.ATOM, None))
         self.current_table.define(ObjectSymbol(node.name, node, node.type, node.constraints))
 
     def visit_Constant(self, node: ast.Constant) -> None:
@@ -445,15 +454,29 @@ class SymbolTableBuilder(ast.ASTVisitor):
         if s is not None:
             raise CCLSymbolError(node.name, f'Symbol {node.name.val} already defined.')
 
-        self._iterating_over.add(node.name.val)
         table = SymbolTable(self.current_table)
+
+        atom_indices = set()
+        if node.atom_indices is not None:
+            i1, i2 = node.atom_indices
+            s1 = self.current_table.resolve(i1)
+            s2 = self.current_table.resolve(i2)
+            if s1 is not None or s2 is not None:
+                raise CCLSymbolError(node, f'Decomposition of bond symbol {node.name.val} used already defined names.')
+
+            table.define(ObjectSymbol(i1, node, ast.ObjectType.ATOM, None))
+            table.define(ObjectSymbol(i2, node, ast.ObjectType.ATOM, None))
+            atom_indices = {i1, i2}
+
+        self._iterating_over |= atom_indices | {node.name.val}
+
         node.symbol_table = table
         table.define(ObjectSymbol(node.name.val, node, node.type, node.constraints))
         self.current_table = table
         for statement in node.body:
             self.visit(statement)
 
-        self._iterating_over.remove(node.name.val)
+        self._iterating_over -= atom_indices | {node.name.val}
         self.current_table = self.current_table.parent
 
     def visit_Sum(self, node: ast.Sum) -> None:

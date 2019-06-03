@@ -4,7 +4,10 @@ method: 'name' method_name=NAME body+=statement+ ('where' annotations+=annotatio
 statement: assign | for_loop | for_each;
 assign: lhs=var '=' rhs=expr;
 for_loop: 'for' identifier=NAME '=' value_from=number 'to' value_to=number ':' body+=statement+ 'done';
-for_each: 'for each' abtype=('atom' | 'bond') identifier=NAME ('such that' constraint)? ':' body+=statement+ 'done';
+for_each: 'for each' abtype=objtype identifier=NAME (bond_decomp)? ('such that' constraint)? ':' body+=statement+ 'done';
+
+objtype: 'atom' | 'bond';
+bond_decomp: '=' '[' indices+=NAME ',' indices+=NAME ']';
 
 expr: <assoc=right> left=expr op='^' right=expr                 #BinOp
     | op=('+' | '-') expr                                       #UnaryOp
@@ -24,11 +27,11 @@ var: basename | subscript;
 basename: name=NAME;
 subscript: name=NAME '[' indices+=NAME (',' indices+=NAME)? ']';
 
-annotation: var '=' expr ('if' constraint)?                                     #ExprAnnotation
-          | name=NAME 'is' ptype=('atom' | 'bond' | 'common') 'parameter'       #ParameterAnnotation
-          | name=NAME 'is' objtype=('atom' | 'bond') ('such that' constraint)?  #ObjectAnnotation
-          | name=NAME 'is' ptype+=NAME+ 'of' element=NAME                       #ConstantAnnotation
-          | name=NAME 'is' ptype+=NAME+                                         #PropertyAnnotation
+annotation: var '=' expr ('if' constraint)?                                         #ExprAnnotation
+          | name=NAME 'is' ptype=('atom' | 'bond' | 'common') 'parameter'           #ParameterAnnotation
+          | name=NAME (bond_decomp)? 'is' abtype=objtype ('such that' constraint)?  #ObjectAnnotation
+          | name=NAME 'is' ptype+=NAME+ 'of' element=NAME                           #ConstantAnnotation
+          | name=NAME 'is' ptype+=NAME+                                             #PropertyAnnotation
           ;
 
 constraint: left=constraint op=('and' | 'or') right=constraint                #AndOrConstraint

@@ -34,6 +34,16 @@ class CCLVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by CCLParser#objtype.
+    def visitObjtype(self, ctx:CCLParser.ObjtypeContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by CCLParser#bond_decomp.
+    def visitBond_decomp(self, ctx:CCLParser.Bond_decompContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by CCLParser#UnaryOp.
     def visitUnaryOp(self, ctx:CCLParser.UnaryOpContext):
         return self.visitChildren(ctx)

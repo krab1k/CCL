@@ -53,6 +53,24 @@ class CCLListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by CCLParser#objtype.
+    def enterObjtype(self, ctx:CCLParser.ObjtypeContext):
+        pass
+
+    # Exit a parse tree produced by CCLParser#objtype.
+    def exitObjtype(self, ctx:CCLParser.ObjtypeContext):
+        pass
+
+
+    # Enter a parse tree produced by CCLParser#bond_decomp.
+    def enterBond_decomp(self, ctx:CCLParser.Bond_decompContext):
+        pass
+
+    # Exit a parse tree produced by CCLParser#bond_decomp.
+    def exitBond_decomp(self, ctx:CCLParser.Bond_decompContext):
+        pass
+
+
     # Enter a parse tree produced by CCLParser#UnaryOp.
     def enterUnaryOp(self, ctx:CCLParser.UnaryOpContext):
         pass

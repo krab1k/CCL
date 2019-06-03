@@ -320,11 +320,12 @@ class For(Statement):
 
 
 class ForEach(Statement):
-    def __init__(self, pos: Tuple[int, int], name: Name, otype: ObjectType, constraints: Constraint,
-                 body: List[Statement]) -> None:
+    def __init__(self, pos: Tuple[int, int], name: Name, otype: ObjectType, atom_indices: Optional[Tuple[str, str]],
+                 constraints: Constraint, body: List[Statement]) -> None:
         super().__init__(pos)
         self.name: Name = name
         self.type: ObjectType = otype
+        self.atom_indices: Optional[Tuple[str, str]] = atom_indices
         self.constraints: Constraint = constraints
         self.body: List[Statement] = body
         self.symbol_table = None
@@ -392,10 +393,12 @@ class Substitution(Annotation):
 
 
 class Object(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: str, otype: ObjectType, constraints: Optional[Constraint]) -> None:
+    def __init__(self, pos: Tuple[int, int], name: str, otype: ObjectType, atom_indices: Union[None, Tuple[str, str]],
+                 constraints: Optional[Constraint]) -> None:
         super().__init__(pos)
         self.name: str = name
         self.type: ObjectType = otype
+        self.atom_indices: Optional[Tuple[str, str]] = atom_indices
         self.constraints: Optional[Constraint] = constraints
 
 

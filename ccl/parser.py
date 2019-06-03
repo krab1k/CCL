@@ -55,13 +55,23 @@ class Parser(CCLVisitor):
         ptype = ast.ParameterType(ctx.ptype.text.capitalize() + ' Parameter')
         return ast.Parameter(self.get_pos(ctx), ctx.name.text, ptype)
 
+    def visitObjtype(self, ctx: CCLParser.ObjtypeContext) -> str:
+        return ctx.getText()
+
     def visitObjectAnnotation(self, ctx: CCLParser.ObjectAnnotationContext) -> ast.Object:
-        object_type = ast.ObjectType(ctx.objtype.text.capitalize())
+        object_type = ast.ObjectType(self.visit(ctx.abtype).capitalize())
         if ctx.constraint():
             constraint = self.visit(ctx.constraint())
         else:
             constraint = None
-        return ast.Object(self.get_pos(ctx), ctx.name.text, object_type, constraint)
+
+        if ctx.bond_decomp():
+            if object_type != ast.ObjectType.BOND:
+                raise CCLSyntaxError(ast.ASTNode(self.get_pos(ctx.abtype)), f'Only bonds can be decomposed.')
+            atom_indices = tuple(i.text for i in ctx.bond_decomp().indices)
+        else:
+            atom_indices = None
+        return ast.Object(self.get_pos(ctx), ctx.name.text, object_type, atom_indices, constraint)
 
     def visitAndOrConstraint(self, ctx: CCLParser.AndOrConstraintContext) -> ast.BinaryLogicalOp:
         lhs = self.visit(ctx.left)
@@ -157,16 +167,24 @@ class Parser(CCLVisitor):
 
     def visitFor_each(self, ctx: CCLParser.For_eachContext) -> ast.ForEach:
         name = ast.Name(self.get_pos(ctx.identifier), ctx.identifier.text, ast.VarContext.STORE)
-        object_type = ast.ObjectType(ctx.abtype.text.capitalize())
+        object_type = ast.ObjectType(self.visit(ctx.abtype).capitalize())
         if ctx.constraint() is not None:
             constraint = self.visit(ctx.constraint())
         else:
             constraint = None
+
+        if ctx.bond_decomp():
+            if object_type != ast.ObjectType.BOND:
+                raise CCLSyntaxError(ast.ASTNode(self.get_pos(ctx.abtype)), f'Only bonds can be decomposed.')
+            atom_indices = tuple(i.text for i in ctx.bond_decomp().indices)
+        else:
+            atom_indices = None
+
         body = []
         for statement in ctx.body:
             body.append(self.visit(statement))
 
-        return ast.ForEach(self.get_pos(ctx), name, object_type, constraint, body)
+        return ast.ForEach(self.get_pos(ctx), name, object_type, atom_indices, constraint, body)
 
     def visitPropertyAnnotation(self, ctx: CCLParser.PropertyAnnotationContext) -> ast.Property:
         names = ' '.join(name.text for name in ctx.ptype)
