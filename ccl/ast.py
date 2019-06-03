@@ -45,7 +45,7 @@ class ArrayType(Type):
         return f'ArrayType{self.indices}'
 
     def __str__(self) -> str:
-        args_str = ', '.join(f'{arg}' for arg in self.indices)
+        args_str = ', '.join(str(arg) for arg in self.indices)
         return f'Float[{args_str}]'
 
     def __eq__(self, other) -> bool:
@@ -109,7 +109,7 @@ class ASTVisitor:
 
     def generic_visit(self, node: ASTNode) -> None:
         for _, value in node:
-            if isinstance(value, list):
+            if isinstance(value, (list, tuple)):
                 for item in value:
                     if isinstance(item, ASTNode):
                         self.visit(item)
@@ -196,12 +196,21 @@ class Number(Expression):
         self.val: Union[int, float] = val
         self.result_type = ntype
 
+    def __repr__(self) -> str:
+        return f'Number({self.val})'
+
 
 class Name(Expression):
     def __init__(self, pos: Tuple[int, int], name: str, ctx: VarContext) -> None:
         super().__init__(pos)
         self.val: str = name
         self.ctx: VarContext = ctx
+
+    def __repr__(self) -> str:
+        return f'Name({self.val})'
+
+    def __eq__(self, other):
+        return self.val == other.val and self.ctx == other.ctx
 
 
 class BinaryOp(Expression):
@@ -242,6 +251,10 @@ class Subscript(Expression):
         self.name: Name = name
         self.indices: List[Name] = indices
         self.ctx: VarContext = ctx
+
+    def __repr__(self) -> str:
+        indices_str = ', '.join(str(i) for i in self.indices)
+        return f'Subscript({self.name}, [{indices_str}])'
 
 
 class Function(Expression):

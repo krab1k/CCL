@@ -109,8 +109,8 @@ class SubstitutionSymbol(Symbol):
         return f'SubstitutionSymbol({self.name}, {self.indices})'
 
     def symbol_type(self) -> Union[ast.NumericType, ast.ArrayType, ast.ObjectType, ast.ArrayType, ast.ParameterType]:
-        # All the expressions must have same type, so pick the first one
-        return next(iter(self.rules.values())).result_type
+        # All the expressions must have same type, so pick the default one
+        return self.rules[None].result_type
 
 
 class ConstantSymbol(Symbol):
@@ -169,6 +169,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         self.current_table: SymbolTable = self.symbol_table
 
         self._iterating_over: Set[str] = set()
+        self._indices_mapping: Dict[str, str] = {}
 
         # Add math function names to the global table
         for fn_name in MATH_FUNCTIONS_NAMES:
@@ -176,6 +177,10 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         # q is always a vector of charges
         self.global_table.define(VariableSymbol('q', None, ast.ArrayType(ast.ObjectType.ATOM, )))
+
+    @property
+    def iterating_over(self) -> Set[str]:
+        return {self._indices_mapping.get(i, i) for i in self._iterating_over}
 
     def visit_Method(self, node: ast.Method) -> None:
         node.symbol_table = self.current_table
@@ -203,41 +208,68 @@ class SymbolTableBuilder(ast.ASTVisitor):
         self.current_table.define(FunctionSymbol(node.name, node, f))
 
     def visit_Name(self, node: ast.Name) -> None:
-        s = self.current_table.resolve(node.val)
+        name = self._indices_mapping.get(node.val, node.val)
+        s = self.current_table.resolve(name)
         if s is not None:
+            if isinstance(s, SubstitutionSymbol):
+                self.visit(s.rules[None])
             node.result_type = s.symbol_type()
         else:
-            raise CCLSymbolError(node, f'Symbol {node.val} not defined.')
+            raise CCLSymbolError(node, f'Symbol {name} not defined.')
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
-        self.visit(node.name)
         s = self.current_table.resolve(node.name.val)
+        if not isinstance(s, SubstitutionSymbol):
+            self.visit(node.name)
+
         symbol_type = node.name.result_type
 
         index_types = []
         for idx in node.indices:
             self.visit(idx)
             index_types.append(idx.result_type)
-            if isinstance(idx.result_type, ast.ObjectType) and idx.val not in self._iterating_over:
-                raise CCLSymbolError(idx, f'Object {idx.val} not bound to any For/ForEach/Sum.')
+            mapped_val = self._indices_mapping.get(idx.val, idx.val)
+            if isinstance(idx.result_type, ast.ObjectType) and \
+                    mapped_val not in self.iterating_over:
+                raise CCLSymbolError(idx, f'Object {mapped_val} not bound to any For/ForEach/Sum.')
         index_types = tuple(index_types)
         index_types_str = ', '.join(str(i) for i in index_types)
 
-        if isinstance(symbol_type, ast.ParameterType):
+        if isinstance(s, ParameterSymbol):
             if symbol_type == ast.ParameterType.ATOM and index_types != (ast.ObjectType.ATOM,) or \
                symbol_type == ast.ParameterType.BOND and index_types != (ast.ObjectType.BOND,):
                 raise CCLTypeError(node, f'Cannot index parameter symbol of type {symbol_type} with {index_types_str}.')
-        elif isinstance(symbol_type, ast.ArrayType):
+        elif isinstance(s, VariableSymbol) and isinstance(symbol_type, ast.ArrayType):
             if symbol_type.indices != index_types:
                 raise CCLTypeError(node, f'Cannot index Array of type {symbol_type} '
                                          f'using index/indices of type(s) {index_types_str}.')
-        elif isinstance(symbol_type, ast.FunctionType):
+        elif isinstance(s, FunctionSymbol):
             if symbol_type.args != index_types:
                 raise CCLTypeError(node, f'Cannot use function {s.function.name}: {s.function.type} '
                                          f'with arguments of type(s) {index_types_str}')
 
             node.result_type = s.function.type.return_type
             return
+        elif isinstance(s, SubstitutionSymbol):
+            if len(s.indices) != len(index_types):
+                raise CCLTypeError(node, f'Bad number of indices for {s.name}, got {len(index_types)}, '
+                                         f'expected {len(s.indices)}.')
+            if not all(isinstance(t, ast.ObjectType) for t in index_types):
+                raise CCLTypeError(node, f'Substitution indices for symbol {s.name} must have type Atom or Bond.')
+
+            self._indices_mapping.update({si.val: ni.val for si, ni in zip(s.indices, node.indices)})
+            types = set()
+            for constraint, expr in s.rules.items():
+                if constraint is not None:
+                    self.visit(constraint)
+                self.visit(expr)
+                types.add(expr.result_type)
+
+            if len(types) > 1:
+                raise CCLTypeError(node, f'All expressions within a substitution symbol {s.name} must have same type.')
+
+            for si in s.indices:
+                self._indices_mapping.pop(si.val)
         else:
             raise CCLTypeError(node, f'Cannot index type {symbol_type} with indices of type(s) {index_types_str}')
 
@@ -269,6 +301,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
             if s is not None:
                 if s.name in self._iterating_over:
                     raise CCLTypeError(node, f'Cannot assign to loop variable {s.name}.')
+                if isinstance(s, SubstitutionSymbol):
+                    raise CCLSymbolError(node.lhs, f'Cannot assign to a substitution symbol {s.name}.')
                 if check_types(s.symbol_type(), rtype):
                     node.lhs.result_type = s.symbol_type()
                 else:
@@ -286,6 +320,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 index_types.append(idx.result_type)
             if s is not None:
                 # Check whether indices are correct
+                if isinstance(s, SubstitutionSymbol):
+                    raise CCLSymbolError(node.lhs, f'Cannot assign to a substitution symbol {s.name}.')
                 if not isinstance(s.symbol_type(), ast.ArrayType):
                     raise CCLTypeError(node.lhs, f'Cannot assign to non Array type {s.symbol_type()}.')
                 index_types = []
@@ -296,11 +332,14 @@ class SymbolTableBuilder(ast.ASTVisitor):
                     indices_str = ', '.join(str(i) for i in index_types)
                     raise CCLTypeError(node.lhs, f'Cannot index Array of type {s.symbol_type()} '
                                                  f'using index/indices of type(s) {indices_str}.')
+
+                node.lhs.name.result_type = s.symbol_type()
             else:
                 if not all(isinstance(i, ast.ObjectType) for i in index_types):
                     raise CCLTypeError(node.lhs, f'Cannot index with something different than Atom or Bond')
                 self.symbol_table.define(VariableSymbol(node.lhs.name.val, node, ast.ArrayType(*index_types)))
-                node.lhs.result_type = rtype
+                node.lhs.name.result_type = ast.ArrayType(*index_types)
+            node.lhs.result_type = rtype
         else:
             raise Exception('Should not get here!')
 
@@ -347,7 +386,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
             else:
                 raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
         #  One is Array, second Number
-        elif isinstance(ltype, (ast.ArrayType, ast.NumericType)) and isinstance(rtype, (ast.ArrayType, ast.NumericType)):
+        elif isinstance(ltype, (ast.ArrayType, ast.NumericType)) and \
+                isinstance(rtype, (ast.ArrayType, ast.NumericType)):
             if isinstance(ltype, ast.ArrayType):
                 node.result_type = ltype
             else:
@@ -427,3 +467,31 @@ class SymbolTableBuilder(ast.ASTVisitor):
         self.current_table = self.current_table.parent
 
         node.result_type = ast.ArrayType(ast.ObjectType.ATOM)
+
+    def visit_Substitution(self, node: ast.Substitution) -> None:
+        if isinstance(node.lhs, ast.Name):
+            name = node.lhs.val
+            indices = None
+            if node.constraints is not None:
+                raise CCLSymbolError(node, f'Substitution symbol {name} cannot have a constraint.')
+        else:  # ast.Subscript
+            name = node.lhs.name.val
+            indices = node.lhs.indices
+
+        s = self.current_table.resolve(name)
+        indices = tuple(indices) if indices is not None else tuple()
+        if s is None:
+            ns = SubstitutionSymbol(name, node, tuple(indices))
+            self.symbol_table.define(ns)
+            ns.rules[node.constraints] = node.rhs
+        else:
+            if not isinstance(s, SubstitutionSymbol):
+                raise CCLSymbolError(node, f'Symbol {s.name} already defined as something else.')
+            if indices != s.indices:
+                raise CCLSymbolError(node, f'Substitution symbol {s.name} has different indices defined.')
+            if node.constraints in s.rules:
+                raise CCLTypeError(node, f'Same constraint already defined for symbol {s.name}.')
+            s.rules[node.constraints] = node.rhs
+
+    def visit_Predicate(self, node: ast.Predicate) -> None:
+        pass
