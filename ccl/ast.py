@@ -63,6 +63,9 @@ class ArrayType(Type):
             return False
         return self.indices == other.indices
 
+    def dim(self) -> int:
+        return len(self.indices)
+
 
 class FunctionType(Type):
     def __init__(self, return_type: Union[BoolType, NumericType, ArrayType],

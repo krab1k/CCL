@@ -34,6 +34,9 @@ for prop in ['electronegativity', 'covalent radius', 'van der waals radius', 'ha
 for prop in ['atomic number', 'valence electron count']:
     FUNCTIONS[prop] = Function(prop, ast.FunctionType(ast.NumericType.INT, ast.ObjectType.ATOM))
 
+# Add bond properties
+FUNCTIONS['order'] = Function('order', ast.FunctionType(ast.NumericType.INT, ast.ObjectType.BOND))
+
 
 # Add custom functions
 FUNCTIONS['formal charge'] = Function('formal charge', ast.FunctionType(ast.NumericType.INT, ast.ObjectType.ATOM))
@@ -417,6 +420,27 @@ class SymbolTableBuilder(ast.ASTVisitor):
                     node.result_type = ltype
                 else:
                     raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
+            elif node.op == ast.BinaryOp.Ops.MUL:
+                if ltype.dim() == rtype.dim() == 2:
+                    if ltype.indices[1] != rtype.indices[0]:
+                        raise CCLTypeError(node, f'Cannot multiply matrices of types {ltype} and {rtype}')
+                    else:
+                        node.result_type = ast.ArrayType(ltype.indices[0], rtype.indices[1])
+                elif ltype.dim() == 1 and rtype.dim() == 2:
+                    if ltype.indices[0] != rtype.indices[0]:
+                        raise CCLTypeError(node, f'Cannot multiply vector of type {ltype} and matrix of type {rtype}')
+                    else:
+                        node.result_type = ast.ArrayType(rtype.indices[1])
+                elif ltype.dim() == 2 and rtype.dim() == 1:
+                    if ltype.indices[1] != rtype.indices[0]:
+                        raise CCLTypeError(node, f'Cannot multiply matrix of type {ltype} with vector of type {rtype}')
+                    else:
+                        node.result_type = ast.ArrayType(ltype.indices[0])
+                elif ltype.dim() == rtype.dim() == 1:
+                    if ltype != rtype:
+                        raise CCLTypeError(node, f'Cannot perform dot product of vectors of types {ltype} and {rtype}')
+                    else:
+                        node.result_type = ast.NumericType.FLOAT
             else:
                 raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
         #  One is Array, second Number

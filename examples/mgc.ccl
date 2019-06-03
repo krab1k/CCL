@@ -1,19 +1,26 @@
 name mgc
 
 for each atom i:
-X0[i] = E[i]
+    X0[i] = E[i]
+    S[i, i] = 1
 done
 
-S = -A + D + I
-X = solve(S, X0)
+for each bond b = [i, j]:
+        a = bo[b]
+        S[i, j] = S[i, j] - a
+        S[j, i] = S[j, i] - a
+        S[i, i] = S[i, i] + a
+        S[j, j] = S[j, j] + a
+done
 
-Xm = sum[j](X[j]) ** (1 / n)
+X = inv(S) * X0
+
+n = sum[k](1.0)
+Xm = sum[k](X[k]) ^ (1 / n)
 
 q = (X - X0) / Xm
 
 where
-A is connectivity matrix
-D is degree matrix
-I is identity matrix
-E is property electronegativity
-j is atom
+bo is order
+E is electronegativity
+k is atom
