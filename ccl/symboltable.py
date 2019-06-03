@@ -280,6 +280,10 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 node.lhs.result_type = rtype
         elif isinstance(node.lhs, ast.Subscript):  # ast.Subscript
             s = self.current_table.resolve(node.lhs.name.val)
+            index_types = []
+            for idx in node.lhs.indices:
+                self.visit(idx)
+                index_types.append(idx.result_type)
             if s is not None:
                 # Check whether indices are correct
                 if not isinstance(s.symbol_type(), ast.ArrayType):
@@ -292,6 +296,11 @@ class SymbolTableBuilder(ast.ASTVisitor):
                     indices_str = ', '.join(str(i) for i in index_types)
                     raise CCLTypeError(node.lhs, f'Cannot index Array of type {s.symbol_type()} '
                                                  f'using index/indices of type(s) {indices_str}.')
+            else:
+                if not all(isinstance(i, ast.ObjectType) for i in index_types):
+                    raise CCLTypeError(node.lhs, f'Cannot index with something different than Atom or Bond')
+                self.symbol_table.define(VariableSymbol(node.lhs.name.val, node, ast.ArrayType(*index_types)))
+                node.lhs.result_type = rtype
         else:
             raise Exception('Should not get here!')
 
