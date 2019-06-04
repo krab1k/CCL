@@ -2,7 +2,7 @@
 
 import itertools
 import html
-from typing import List, Dict, Union
+from typing import List, Dict
 from enum import Enum
 
 from ccl import ast, symboltable
@@ -81,18 +81,16 @@ class Graphviz(ast.ASTVisitor):
         return gn
 
     def generic_visit(self, node: ast.ASTNode) -> None:
+        same_level = []
         for field, value in node:
             if isinstance(value, list):
-                same_level = []
                 for idx, item in enumerate(value):
                     if isinstance(item, ast.ASTNode):
                         gn = self._visit(f'{field}:{idx}', item)
                         same_level.append(f'node{gn.idx}')
-                if len(same_level) > 1:
-                    self.edges.append(' -> '.join(same_level) + '[style = invis]')
-                    self.edges.append('{rank=same; ' + '; '.join(same_level) + '}')
             elif isinstance(value, ast.ASTNode):
-                self._visit(field, value)
+                gn = self._visit(field, value)
+                same_level.append(f'node{gn.idx}')
             else:
                 if isinstance(value, Enum):
                     self.current_node.properties.append(html.escape(f'{field} = {value.value}'))
@@ -100,6 +98,10 @@ class Graphviz(ast.ASTVisitor):
                     pass
                 else:
                     self.current_node.properties.append(f'{field} = {value}')
+
+        if len(same_level) > 1:
+            self.edges.append(' -> '.join(same_level) + ' [style = invis]')
+            self.edges.append('{rank=same; ' + '; '.join(same_level) + '}')
 
     def visit_Method(self, node: ast.Method) -> str:
         st = SymbolTableNode(len(self.symbol_table_nodes) + 1, node.symbol_table.symbols)
