@@ -70,7 +70,7 @@ class ArrayType(Type):
 class FunctionType(Type):
     def __init__(self, return_type: Union[BoolType, NumericType, ArrayType],
                  *args: Union[ObjectType, NumericType, ArrayType, StringType]) -> None:
-        self.args: Tuple[Union[ObjectType, NumericType, ArrayType], ...] = args
+        self.args: Tuple[Union[ObjectType, NumericType, ArrayType, StringType], ...] = args
         self.return_type: Union[BoolType, NumericType, ArrayType] = return_type
 
     def __repr__(self) -> str:
@@ -188,7 +188,7 @@ class Method(ASTNode):
         self.statements: List[Statement] = statements
         self.annotations: List[Annotation] = annotations
         self.symbol_table = None
-        self.name = name
+        self.name: str = name
 
     def print_ast(self) -> None:
         for s in self.statements:
@@ -201,14 +201,14 @@ class Method(ASTNode):
 class Expression(ASTNode):
     def __init__(self, pos: Tuple[int, int]) -> None:
         super().__init__(pos)
-        self._result_type: Optional[Union[NumericType, ParameterType, ObjectType]] = None
+        self._result_type: Optional[Union[NumericType, ArrayType, ParameterType, ObjectType, FunctionType]] = None
 
     @property
-    def result_type(self) -> Union[NumericType, ParameterType, ObjectType, FunctionType]:
+    def result_type(self) -> Optional[Union[NumericType, ArrayType, ParameterType, ObjectType, FunctionType]]:
         return self._result_type
 
     @result_type.setter
-    def result_type(self, value: Union[NumericType, ParameterType, ObjectType, FunctionType]) -> None:
+    def result_type(self, value: Union[NumericType, ArrayType, ParameterType, ObjectType, FunctionType]) -> None:
         self._result_type = value
 
 

@@ -158,9 +158,9 @@ class Latex(ast.ASTVisitor):
         functions = []
         for symbol in self.symbol_table.symbols.values():
             if isinstance(symbol, symboltable.ParameterSymbol):
-                if symbol.kind == ast.ParameterType.ATOM:
+                if symbol.type == ast.ParameterType.ATOM:
                     atom_parameters.append(symbol)
-                elif symbol.kind == ast.ParameterType.BOND:
+                elif symbol.type == ast.ParameterType.BOND:
                     bond_parameters.append(symbol)
                 else:
                     common_parameters.append(symbol)
@@ -185,7 +185,7 @@ class Latex(ast.ASTVisitor):
             for symbol in expressions:
                 if len(symbol.rules) == 1:
                     if symbol.indices:
-                        indices = '_{' + ', '.join(idx for idx in symbol.indices) + '}'
+                        indices = '_{' + ', '.join(idx.val for idx in symbol.indices) + '}'
                     else:
                         indices = ''
                     expressions_string.append(f'${get_name(symbol.name)}{indices} = '
@@ -199,7 +199,7 @@ class Latex(ast.ASTVisitor):
                             c = '\\text{otherwise}\\\\'
                         value_str = self.visit(value)
                         rules += f'{value_str} & {c}\n'
-                    indices = '_{' + ', '.join(idx for idx in symbol.indices) + '}'
+                    indices = '_{' + ', '.join(idx.val for idx in symbol.indices) + '}'
                     expressions_string.append(f'${get_name(symbol.name)}{indices} = \n\\begin{{cases}}\n'
                                               f'{rules}\\end{{cases}}$')
             self.inside_math = False

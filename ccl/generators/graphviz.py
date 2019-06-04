@@ -17,7 +17,8 @@ class GraphNode:
         self.properties: List[str] = []
 
     def __str__(self) -> str:
-        property_string = '<br/>'.join(prop for prop in self.properties if not prop.startswith('_') or prop == '_result_type')
+        property_string = '<br/>'.join(
+            prop for prop in self.properties if not prop.startswith('_') or prop == '_result_type')
         return f'node{self.idx} [label = < <b>{self.node_type}</b><br/> {property_string} >]'
 
 
@@ -43,7 +44,8 @@ class Graphviz(ast.ASTVisitor):
         gn = GraphNode(0, 'Method')
         self.nodes.append(gn)
         self.current_node: GraphNode = gn
-        self.current_table_node: SymbolTableNode = SymbolTableNode(len(self.symbol_table_nodes) + 1, table.parent.symbols)
+        self.current_table_node: SymbolTableNode = SymbolTableNode(len(self.symbol_table_nodes) + 1,
+                                                                   table.parent.symbols)
         self.symbol_table_nodes.append(self.current_table_node)
 
         self.annotate_results: bool = False

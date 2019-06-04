@@ -61,7 +61,8 @@ class Symbol(ABC):
         self.def_node: Optional[ast.ASTNode] = def_node
 
     @abstractmethod
-    def symbol_type(self) -> Union[ast.NumericType, ast.ArrayType, ast.ObjectType, ast.ArrayType, ast.ParameterType]:
+    def symbol_type(self) -> Union[ast.NumericType, ast.ArrayType, ast.ObjectType, ast.ArrayType, ast.ParameterType,
+                                   ast.FunctionType]:
         pass
 
 

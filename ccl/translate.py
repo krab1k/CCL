@@ -35,3 +35,5 @@ def translate(source: str, output_language: Optional[str] = None, output_dir: Op
         g = generator(table, output_dir=output_dir, **kwargs)
         code = str(g.visit(ast))
         return code
+    else:
+        return None

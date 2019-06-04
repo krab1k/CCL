@@ -55,9 +55,9 @@ class Cpp(ast.ASTVisitor):
         common_parameters = []
         for symbol in self.symbol_table.symbols.values():
             if isinstance(symbol, symboltable.ParameterSymbol):
-                if symbol.kind == ast.ParameterType.ATOM:
+                if symbol.type == ast.ParameterType.ATOM:
                     atom_parameters.append(symbol.name)
-                elif symbol.kind == ast.ParameterType.BOND:
+                elif symbol.type == ast.ParameterType.BOND:
                     bond_parameters.append(symbol.name)
                 else:
                     common_parameters.append(symbol.name)
@@ -223,10 +223,10 @@ double {method_name}::{name}({args}) const {{
             indices = ', '.join(f'{self.visit(idx)}.index()' for idx in node.indices)
             return f'{name}[{indices}]'
 
-        if isinstance(symbol, symboltable.ParameterSymbol) and symbol.kind == ast.ParameterType.ATOM:
+        if isinstance(symbol, symboltable.ParameterSymbol) and symbol.type == ast.ParameterType.ATOM:
             return f'parameters_->atom()->parameter(atom::{symbol.name})({node.indices[0].val})'
 
-        if isinstance(symbol, symboltable.ParameterSymbol) and symbol.kind == ast.ParameterType.BOND:
+        if isinstance(symbol, symboltable.ParameterSymbol) and symbol.type == ast.ParameterType.BOND:
             if len(node.indices) == 1:
                 return f'parameters_->bond()->parameter(bond::{symbol.name})({node.indices[0].val})'
             else:
