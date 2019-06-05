@@ -305,9 +305,9 @@ class EE(Expression):
 
 
 class Assign(Statement):
-    def __init__(self, pos: Tuple[int, int], lhs: Expression, rhs: Expression) -> None:
+    def __init__(self, pos: Tuple[int, int], lhs: Union[Name, Subscript], rhs: Expression) -> None:
         super().__init__(pos)
-        self.lhs: Expression = lhs
+        self.lhs: Union[Name, Subscript] = lhs
         self.rhs: Expression = rhs
 
 

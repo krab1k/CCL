@@ -27,19 +27,25 @@ FUNCTIONS['inv'] = Function('inv', ast.FunctionType(ast.ArrayType(ast.ObjectType
                                                     ast.ArrayType(ast.ObjectType.ATOM, ast.ObjectType.ATOM)))
 
 # Add atom properties
-for prop in ['electronegativity', 'covalent radius', 'van der waals radius', 'hardness', 'ionization potential',
-             'electron affinity']:
+FLOAT_ELEMENT_PROPERTIES = {'electronegativity', 'covalent radius', 'van der waals radius', 'hardness',
+                            'ionization potential', 'electron affinity'}
+
+INT_ELEMENT_PROPERTIES = {'atomic number', 'valence electron count'}
+
+ELEMENT_PROPERTIES = FLOAT_ELEMENT_PROPERTIES | INT_ELEMENT_PROPERTIES
+
+for prop in FLOAT_ELEMENT_PROPERTIES:
     FUNCTIONS[prop] = Function(prop, ast.FunctionType(ast.NumericType.FLOAT, ast.ObjectType.ATOM))
 
-for prop in ['atomic number', 'valence electron count']:
+for prop in INT_ELEMENT_PROPERTIES | {'formal charge'}:
     FUNCTIONS[prop] = Function(prop, ast.FunctionType(ast.NumericType.INT, ast.ObjectType.ATOM))
 
 # Add bond properties
+
 FUNCTIONS['order'] = Function('order', ast.FunctionType(ast.NumericType.INT, ast.ObjectType.BOND))
 
 
 # Add custom functions
-FUNCTIONS['formal charge'] = Function('formal charge', ast.FunctionType(ast.NumericType.INT, ast.ObjectType.ATOM))
 FUNCTIONS['distance'] = Function('distance',
                                  ast.FunctionType(ast.NumericType.FLOAT, ast.ObjectType.ATOM, ast.ObjectType.ATOM))
 
@@ -179,6 +185,13 @@ class SymbolTable:
         visitor = SymbolTableBuilder()
         visitor.visit(node)
         return visitor.symbol_table
+
+    @classmethod
+    def get_table_for_node(cls, node: ast.ASTNode):
+        if hasattr(node, 'symbol_table'):
+            return node.symbol_table
+
+        return cls.get_table_for_node(node.parent)
 
 
 # noinspection PyPep8Naming
