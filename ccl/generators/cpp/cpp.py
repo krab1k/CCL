@@ -57,7 +57,6 @@ class Cpp(ast.ASTVisitor):
 
         self.sys_includes: Set[str] = set()
         self.var_definitions: Dict[str, str] = {}
-        self.var_free: Set[str] = set()
 
     def visit_Method(self, node: ast.Method) -> None:
 
@@ -76,14 +75,11 @@ class Cpp(ast.ASTVisitor):
 
         var_defs_str = '\n'.join(var_def for var_def in self.var_definitions.values())
 
-        var_free_str = '\n'.join(f'mkl_free(_{var});' for var in self.var_free)
-
         method = method_template.format(method_name=node.name.capitalize(),
                                         sys_includes=sys_include_str,
                                         defs=defs_str,
                                         var_definitions=var_defs_str,
-                                        code=code_str,
-                                        free=var_free_str)
+                                        code=code_str)
 
         atom_parameters = []
         bond_parameters = []
@@ -154,9 +150,12 @@ class Cpp(ast.ASTVisitor):
                 definition = f'double _{symbol.name} = 0.0;'
             else:  # ast.ArrayType
                 self.sys_includes.add('mkl.h')
-                sizes = ' * '.join('n' if t == ast.ObjectType.ATOM else 'm' for t in symbol.type.indices)
-                definition = f'auto *_{symbol.name} = static_cast<double *>(mkl_calloc({sizes}, sizeof(double), 64));'
-                self.var_free.add(symbol.name)
+                sizes = ', '.join('n' if t == ast.ObjectType.ATOM else 'm' for t in symbol.type.indices)
+                if len(symbol.type.indices) == 1:
+                    var_type = 'VectorXd'
+                else:
+                    var_type = 'MatrixXd'
+                definition = f'Eigen::{var_type} _{symbol.name}({sizes});'
 
             self.var_definitions[symbol.name] = definition
 
@@ -242,16 +241,11 @@ class Cpp(ast.ASTVisitor):
         elif isinstance(symbol, symboltable.VariableSymbol):
             if len(node.indices) == 1:
                 idx = self.visit(node.indices[0])
-                return f'_{name}[{idx}.index()]'
+                return f'_{name}({idx}.index())'
             else:  # == 2
                 idx1 = self.visit(node.indices[0])
                 idx2 = self.visit(node.indices[1])
-                s1 = table.resolve(node.indices[1].val)
-                if s1.type == ast.ObjectType.ATOM:
-                    col_size = 'n'
-                else:  # ast.ObjectType.BOND
-                    col_size = 'm'
-                return f'_{name}[ {idx1}.index() * {col_size} + {idx2}.index()]'
+                return f'_{name}({idx1}.index(), {idx2}.index())'
         elif isinstance(symbol, symboltable.SubstitutionSymbol):
             # TODO substitution symbols
             return ''
