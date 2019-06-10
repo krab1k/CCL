@@ -461,6 +461,10 @@ class SymbolTableBuilder(ast.ASTVisitor):
         #  One is Array, second Number
         elif isinstance(ltype, (ast.ArrayType, ast.NumericType)) and \
                 isinstance(rtype, (ast.ArrayType, ast.NumericType)):
+            if node.op not in (ast.BinaryOp.Ops.MUL, ast.BinaryOp.Ops.DIV):
+                raise CCLTypeError(node, f'Cannot perform operation other than * or / between Number and Array.')
+            if node.op == ast.BinaryOp.Ops.DIV and isinstance(ltype, ast.NumericType) and isinstance(rtype, ast.ArrayType):
+                raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
             if isinstance(ltype, ast.ArrayType):
                 node.result_type = ltype
             else:

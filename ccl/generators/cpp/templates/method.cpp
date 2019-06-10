@@ -17,10 +17,5 @@ std::vector<double> {method_name}::calculate_charges(const Molecule &molecule) c
 
 {code}
 
-    std::vector<double> q(n, 0);
-    for (size_t i = 0; i < n; i++) {{
-        q[i] = _q(i);
-    }}
-
-    return q;
+    return std::vector<double> (_q.data(), _q.data() + _q.size());
 }}

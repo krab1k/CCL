@@ -149,18 +149,20 @@ class Cpp(ast.ASTVisitor):
             elif symbol.type == ast.NumericType.FLOAT:
                 definition = f'double _{symbol.name} = 0.0;'
             else:  # ast.ArrayType
-                self.sys_includes.add('mkl.h')
                 sizes = ', '.join('n' if t == ast.ObjectType.ATOM else 'm' for t in symbol.type.indices)
                 if len(symbol.type.indices) == 1:
                     var_type = 'VectorXd'
                 else:
                     var_type = 'MatrixXd'
-                definition = f'Eigen::{var_type} _{symbol.name}({sizes});'
+                definition = f'Eigen::{var_type} _{symbol.name} = Eigen::{var_type}::Zero({sizes});'
 
             self.var_definitions[symbol.name] = definition
 
-        # TODO Assign number to array
-        return f'{lhs} = {rhs};'
+        if isinstance(node.lhs, ast.Name) and isinstance(symbol.type, ast.ArrayType) and \
+                isinstance(node.rhs.result_type, ast.NumericType):
+            return f'{lhs}.fill({rhs});'
+        else:
+            return f'{lhs} = {rhs};'
 
     def visit_For(self, node: ast.For) -> str:
         code = []
@@ -205,15 +207,18 @@ class Cpp(ast.ASTVisitor):
             if node.op == ast.BinaryOp.Ops.POW:
                 self.sys_includes.add('cmath')
                 return f'pow({left}, {right})'
-            else:
-                if not ast.is_atom(node.left):
-                    left = f'({left})'
-                if not ast.is_atom(node.right):
-                    right = f'({right})'
-                return f'{left} {node.op.value} {right}'
 
-        # TODO matrix and vector operations
-        return ''
+        if not ast.is_atom(node.left):
+            left = f'({left})'
+
+        if not ast.is_atom(node.right):
+            right = f'({right})'
+
+        if isinstance(node.right.result_type, ast.ArrayType) and isinstance(node.left.result_type, ast.ArrayType) and \
+                node.left.result_type.dim() == 1:
+            left = f'{left}.transpose()'
+
+        return f'{left} {node.op.value} {right}'
 
     @staticmethod
     def visit_Name(node: ast.Name) -> str:
