@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import Set, Dict
+from typing import Set, Dict, List
 
 from ccl import ast, symboltable
 
@@ -30,6 +30,18 @@ for (const auto &{name}: {objects}) {{
 }}
 '''
 
+sum_template = '''\
+double {method_name}::sum_{number}({args}) const {{
+    double s = 0;
+    for (const auto &_{name}: {objects}) {{
+        s += {expr};
+    }}
+    return s;
+}}
+'''
+
+sum_prototype = 'double sum_{number}({args}) const;'
+
 
 functions = {
     'electronegativity': 'electronegativity',
@@ -53,12 +65,19 @@ class Cpp(ast.ASTVisitor):
         else:
             raise Exception('No output dir provided')
 
-        self.format_code: bool = kwargs['format_code'] if 'format_code' in kwargs else False
+        self.format_code: bool = kwargs['format_code'] if 'format_code' in kwargs else True
 
         self.sys_includes: Set[str] = set()
         self.var_definitions: Dict[str, str] = {}
+        self.method_name: str = ''
+
+        self.defs: List[str] = []
+        self.prototypes: List[str] = []
+        self.sum_count: int = 0
 
     def visit_Method(self, node: ast.Method) -> None:
+
+        self.method_name = node.name.capitalize()
 
         code = []
         for statement in node.statements:
@@ -71,11 +90,13 @@ class Cpp(ast.ASTVisitor):
 
         code_str = '\n'.join(code)
 
-        defs_str = ''
+        defs_str = '\n'.join(self.defs)
+
+        prototypes_str = '\n'.join(self.prototypes)
 
         var_defs_str = '\n'.join(var_def for var_def in self.var_definitions.values())
 
-        method = method_template.format(method_name=node.name.capitalize(),
+        method = method_template.format(method_name=self.method_name,
                                         sys_includes=sys_include_str,
                                         defs=defs_str,
                                         var_definitions=var_defs_str,
@@ -112,8 +133,6 @@ class Cpp(ast.ASTVisitor):
             common_parameters_enum_str = 'enum common{{{cp_spec}}};'.format(cp_spec=', '.join(common_parameters))
             common_parameters_str = ', '.join(f'"{par}"' for par in common_parameters)
 
-        prototypes_str = ''
-
         header = header_template.format(method_name=node.name.capitalize(),
                                         common_parameters_enum=common_parameters_enum_str,
                                         atom_parameters_enum=atom_parameters_enum_str,
@@ -133,7 +152,7 @@ class Cpp(ast.ASTVisitor):
             f.write(cmake_template.format(method_name=node.name))
 
         for file in ['ccl_method.cpp', 'ccl_method.h']:
-            args = ['clang-format', '-i', os.path.join(self.output_dir, file)]
+            args = ['clang-format', '-i', '-style={ColumnLimit: 0}', os.path.join(self.output_dir, file)]
             subprocess.run(args)
 
     def visit_Assign(self, node: ast.Assign) -> str:
@@ -264,3 +283,34 @@ class Cpp(ast.ASTVisitor):
                 return f'{idx}.{functions[fname]}()'
 
         raise Exception('Should not get here')
+
+    def visit_Sum(self, node: ast.Sum) -> str:
+        number = self.sum_count
+        self.sum_count += 1
+
+        formal_args = 'const Molecule &molecule'
+        args = 'molecule'
+
+        name = node.name.val
+
+        # TODO handle constraints
+        symbol = self.symbol_table.resolve(name)
+        if symbol.type == ast.ObjectType.ATOM:
+            objects = 'molecule.atoms()'
+        else:  # ast.ObjectType.BOND:
+            objects = 'molecule.bonds()'
+
+        expr = self.visit(node.expr)
+
+        self.prototypes.append(sum_prototype.format(number=number,
+                                                    args=formal_args))
+
+        self.defs.append(sum_template.format(number=number,
+                                             args=formal_args,
+                                             method_name=self.method_name,
+                                             objects=objects,
+                                             name=name,
+                                             expr=expr
+                                             ))
+
+        return f'sum_{number}({args})'
