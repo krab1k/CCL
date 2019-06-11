@@ -19,14 +19,20 @@ sys_include_template = '#include <{file}>'
 
 for_template = '''\
 for (int {i} = {init}; {i} <= {to}; {i}++) {{
-{code}
+    {code}
+}}
+'''
+
+constraint_template = '''\
+if ({constraint}) {{
+    {code}
 }}
 '''
 
 for_each_template = '''\
 for (const auto &{name}: {objects}) {{
-{atom_specs}
-{code}
+    {atom_specs}
+    {code}
 }}
 '''
 
@@ -34,13 +40,21 @@ sum_template = '''\
 double {method_name}::sum_{number}({args}) const {{
     double s = 0;
     for (const auto &_{name}: {objects}) {{
-        s += {expr};
+        {code}
     }}
     return s;
 }}
 '''
 
 sum_prototype = 'double sum_{number}({args}) const;'
+
+substitution_template = '''\
+double {method_name}::{name}({args}) const {{
+    {code}
+}}
+'''
+
+substitution_prototype = 'double {name}({args}) const;'
 
 
 functions = {
@@ -53,7 +67,8 @@ functions = {
     'atomic number': 'Z',
     'valence electron count': 'valence_electron_count',
     'formal charge': 'formal_charge',
-    'order': 'order'
+    'order': 'order',
+    'distance': 'distance'
 }
 
 
@@ -75,9 +90,54 @@ class Cpp(ast.ASTVisitor):
         self.prototypes: List[str] = []
         self.sum_count: int = 0
 
+        self.required_features: Set[str] = set()
+
+    def define_substitutions(self):
+        processed = set()
+        table = self.symbol_table.parent
+        for name, symbol in table.symbols.items():
+            if isinstance(symbol, symboltable.SubstitutionSymbol) and name not in processed:
+                processed.add(name)
+                if not symbol.indices:
+                    args = ''
+                    expr = self.visit(symbol.rules[None])
+                    code = f'return {expr};'
+                else:
+                    # TODO handle bonds
+                    args = ','.join(('const Molecule &molecule',
+                                     *(f'const Atom &_{name.val}' for name in symbol.indices)))
+                    if len(symbol.rules) == 1:
+                        expr = self.visit(symbol.rules[None])
+                        code = f'return {expr};'
+                    else:
+                        code = ''
+                        for cond, expr in symbol.rules.items():
+                            if cond is None:
+                                # Handle default case as the last one
+                                continue
+
+                            cond_str = self.visit(cond)
+                            expr_str = self.visit(expr)
+
+                            code += f'if ({cond_str}) {{ return {expr_str}; }} else '
+
+                        expr_str = self.visit(symbol.rules[None])
+
+                        code += f'{{ return {expr_str}; }}'
+
+                self.prototypes.append(substitution_prototype.format(name=name,
+                                                                     args=args))
+
+                self.defs.append(substitution_template.format(method_name=self.method_name,
+                                                              name=name,
+                                                              args=args,
+                                                              code=code))
+
     def visit_Method(self, node: ast.Method) -> None:
 
         self.method_name = node.name.capitalize()
+
+        self.define_substitutions()
 
         code = []
         for statement in node.statements:
@@ -106,7 +166,7 @@ class Cpp(ast.ASTVisitor):
         bond_parameters = []
         common_parameters = []
 
-        for name, symbol in self.symbol_table.symbols.items():
+        for name, symbol in self.symbol_table.parent.symbols.items():
             if isinstance(symbol, symboltable.ParameterSymbol):
                 if symbol.type == ast.ParameterType.ATOM:
                     atom_parameters.append(name)
@@ -133,6 +193,8 @@ class Cpp(ast.ASTVisitor):
             common_parameters_enum_str = 'enum common{{{cp_spec}}};'.format(cp_spec=', '.join(common_parameters))
             common_parameters_str = ', '.join(f'"{par}"' for par in common_parameters)
 
+        required_features_str = ', '.join(self.required_features)
+
         header = header_template.format(method_name=node.name.capitalize(),
                                         common_parameters_enum=common_parameters_enum_str,
                                         atom_parameters_enum=atom_parameters_enum_str,
@@ -140,7 +202,8 @@ class Cpp(ast.ASTVisitor):
                                         common_parameters=common_parameters_str,
                                         atom_parameters=atom_parameters_str,
                                         bond_parameters=bond_parameters_str,
-                                        prototypes=prototypes_str)
+                                        prototypes=prototypes_str,
+                                        required_features=required_features_str)
 
         with open(os.path.join(self.output_dir, 'ccl_method.cpp'), 'w') as f:
             f.write(method)
@@ -199,16 +262,14 @@ class Cpp(ast.ASTVisitor):
 
         code_str = '\n'.join(code)
 
-        type_str = node.type.value.lower()
-
-        # TODO handle constraints
-        if node.constraints is None:
-            objects_str = f'molecule.{type_str}s()'
-        else:
-            raise NotImplementedError('Constraints are not implemented.')
-
-        atom_specs_str = ''
+        objects_str = f'molecule.{node.type.value.lower()}s()'
         name = self.visit(node.name)
+
+        if node.constraints is not None:
+            code_str = constraint_template.format(constraint=self.visit(node.constraints),
+                                                  code=code_str)
+        atom_specs_str = ''
+
         if node.atom_indices is not None:
             atom_specs_str = f'const auto &_{node.atom_indices[0]} = {name}.first();\n' \
                              f'const auto &_{node.atom_indices[1]} = {name}.second();\n'
@@ -271,8 +332,8 @@ class Cpp(ast.ASTVisitor):
                 idx2 = self.visit(node.indices[1])
                 return f'_{name}({idx1}.index(), {idx2}.index())'
         elif isinstance(symbol, symboltable.SubstitutionSymbol):
-            # TODO substitution symbols
-            return ''
+            args = ','.join(('molecule', *(f'_{name.val}' for name in node.indices)))
+            return f'{symbol.name}({args})'
         elif isinstance(symbol, symboltable.FunctionSymbol):
             fname = symbol.function.name
             if fname in symboltable.ELEMENT_PROPERTIES:
@@ -281,6 +342,12 @@ class Cpp(ast.ASTVisitor):
             elif fname in {'formal charge', 'order'}:
                 idx = self.visit(node.indices[0])
                 return f'{idx}.{functions[fname]}()'
+            elif fname == 'distance':
+                idx1 = self.visit(node.indices[0])
+                idx2 = self.visit(node.indices[1])
+                return f'{functions[fname]}({idx1}, {idx2})'
+            else:
+                raise NotImplementedError(f'Unknown function: {fname}')
 
         raise Exception('Should not get here')
 
@@ -288,29 +355,79 @@ class Cpp(ast.ASTVisitor):
         number = self.sum_count
         self.sum_count += 1
 
-        formal_args = 'const Molecule &molecule'
-        args = 'molecule'
+        object_name = node.name.val
 
-        name = node.name.val
+        used_names = set()
+        used_names |= ast.NameGetter().visit(node.expr)
 
-        # TODO handle constraints
-        symbol = self.symbol_table.resolve(name)
+        symbol = self.symbol_table.parent.resolve(object_name)
+
+        expr_str = self.visit(node.expr)
+
+        if symbol.constraints is not None:
+            used_names |= ast.NameGetter().visit(symbol.constraints)
+            code = constraint_template.format(constraint=self.visit(symbol.constraints),
+                                              code=f's += {expr_str};')
+        else:
+            code = f's += {expr_str};'
+
+        types = {
+            ast.NumericType.INT: 'int',
+            ast.NumericType.FLOAT: 'double',
+            ast.ObjectType.ATOM: 'const Atom &',
+            ast.ObjectType.BOND: 'const Bond &',
+        }
+
+        formal_args = ['const Molecule &molecule']
+        args = ['molecule']
+
+        for name in used_names:
+            s = self.symbol_table.parent.resolve(name)
+            if s is None:
+                local_symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(name)
+                if isinstance(local_symbol.type, ast.ArrayType):
+                    type_str = 'const Eigen::MatrixXd &'
+                else:
+                    type_str = types[local_symbol.type]
+
+                formal_args.append(f'{type_str} _{name}')
+                args.append(f'_{name}')
+
+        formal_args_str = ', '.join(formal_args)
+        args_str = ', '.join(args)
+
         if symbol.type == ast.ObjectType.ATOM:
             objects = 'molecule.atoms()'
         else:  # ast.ObjectType.BOND:
             objects = 'molecule.bonds()'
 
-        expr = self.visit(node.expr)
-
         self.prototypes.append(sum_prototype.format(number=number,
-                                                    args=formal_args))
+                                                    args=formal_args_str))
 
         self.defs.append(sum_template.format(number=number,
-                                             args=formal_args,
+                                             args=formal_args_str,
                                              method_name=self.method_name,
                                              objects=objects,
-                                             name=name,
-                                             expr=expr
+                                             name=object_name,
+                                             code=code
                                              ))
 
-        return f'sum_{number}({args})'
+        return f'sum_{number}({args_str})'
+
+    def visit_Predicate(self, node: ast.Predicate) -> str:
+        if node.name == 'element':
+            return f'_{node.args[0].val}.element().name() == "{node.args[1].val.capitalize()}"'
+        elif node.name == 'near':
+            return f'distance(_{node.args[0].val}, _{node.args[1].val}) < {node.args[2].val}'
+        elif node.name == 'bonded':
+            self.required_features.add('RequiredFeatures::BOND_INFO')
+            return f'molecule.bonded(_{node.args[0].val}, _{node.args[1].val})'
+        # TODO check with ChargeFW2
+        elif node.name == 'bond_distance':
+            return f'molecule.bond_distnance(_{node.args[0].val}, _{node.args[1].val}) == {node.args[2].val}'
+
+    def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:
+        return f'({self.visit(node.lhs)}) {node.op.value.lower()} ({self.visit(node.rhs)})'
+
+    def visit_RelOp(self, node: ast.RelOp) -> str:
+        return f'({self.visit(node.lhs)}) {node.op.value} ({self.visit(node.rhs)})'

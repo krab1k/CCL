@@ -161,6 +161,9 @@ class SymbolTable:
     def __repr__(self) -> str:
         return 'SymbolTable'
 
+    def __getitem__(self, item):
+        return self.symbols[item]
+
     def resolve(self, s: str) -> Optional[Symbol]:
         if s in self.symbols:
             return self.symbols[s]
@@ -225,7 +228,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
             self.visit(statement)
 
     def visit_Parameter(self, node: ast.Parameter) -> None:
-        self.current_table.define(ParameterSymbol(node.name, node, node.type))
+        self.current_table.parent.define(ParameterSymbol(node.name, node, node.type))
 
     def visit_Object(self, node: ast.Object) -> None:
         if node.atom_indices is not None:
@@ -235,9 +238,9 @@ class SymbolTableBuilder(ast.ASTVisitor):
             if s1 is not None or s2 is not None:
                 raise CCLSymbolError(node, f'Decomposition of bond symbol {node.name} used already defined names.')
 
-            self.current_table.define(ObjectSymbol(i1, node, ast.ObjectType.ATOM, None))
-            self.current_table.define(ObjectSymbol(i2, node, ast.ObjectType.ATOM, None))
-        self.current_table.define(ObjectSymbol(node.name, node, node.type, node.constraints))
+            self.global_table.define(ObjectSymbol(i1, node, ast.ObjectType.ATOM, None))
+            self.global_table.define(ObjectSymbol(i2, node, ast.ObjectType.ATOM, None))
+        self.global_table.define(ObjectSymbol(node.name, node, node.type, node.constraints))
 
     def visit_Constant(self, node: ast.Constant) -> None:
         try:
@@ -248,7 +251,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         if len(f.type.args) != 1 or f.type.args[0] != ast.ObjectType.ATOM:
             raise CCLTypeError(node, f'Function {node.prop} is not a property')
 
-        self.current_table.define(ConstantSymbol(node.name, node, f, node.element))
+        self.global_table.define(ConstantSymbol(node.name, node, f, node.element))
 
     def visit_Property(self, node: ast.Property) -> None:
         try:
@@ -256,7 +259,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         except KeyError:
             raise CCLSymbolError(node, f'Function {node.prop} is not known.')
 
-        self.current_table.define(FunctionSymbol(node.name, node, f))
+        self.global_table.define(FunctionSymbol(node.name, node, f))
 
     def visit_Name(self, node: ast.Name) -> None:
         name = self._indices_mapping.get(node.val, node.val)
@@ -578,7 +581,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         indices = tuple(indices) if indices is not None else tuple()
         if s is None:
             ns = SubstitutionSymbol(name, node, tuple(indices))
-            self.symbol_table.define(ns)
+            self.global_table.define(ns)
             ns.rules[node.constraints] = node.rhs
         else:
             if not isinstance(s, SubstitutionSymbol):

@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <boost/config.hpp>
+#include <Eigen/Dense>
 
 #include "structures/molecule.h"
 #include "method.h"
@@ -17,6 +18,11 @@ public:
     virtual ~{method_name}() = default;
 
     std::vector<double> calculate_charges(const Molecule &molecule) const override;
+
+    std::vector<RequiredFeatures> get_requirements() const override {{
+        return {{{required_features}}};
+    }}
+
 }};
 
 extern "C" BOOST_SYMBOL_EXPORT {method_name} method;
