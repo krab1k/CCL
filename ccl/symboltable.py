@@ -358,6 +358,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
                     raise CCLTypeError(node, f'Cannot assign to loop variable {s.name}.')
                 if isinstance(s, SubstitutionSymbol):
                     raise CCLSymbolError(node.lhs, f'Cannot assign to a substitution symbol {s.name}.')
+                if isinstance(s, ParameterSymbol):
+                    raise CCLSymbolError(node.lhs, f'Cannot assign to a parameter symbol {s.name}.')
                 if check_types(s.symbol_type(), rtype):
                     node.lhs.result_type = s.symbol_type()
                 else:

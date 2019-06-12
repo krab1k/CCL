@@ -98,6 +98,7 @@ class Cpp(ast.ASTVisitor):
     def define_substitutions(self):
         processed = set()
         table = self.symbol_table.parent
+        # TODO argument may be q as the globally defined symbol
         for name, symbol in table.symbols.items():
             if isinstance(symbol, symboltable.SubstitutionSymbol) and name not in processed:
                 processed.add(name)
@@ -307,10 +308,13 @@ class Cpp(ast.ASTVisitor):
 
     def visit_Name(self, node: ast.Name) -> str:
         symbol = self.symbol_table.resolve(node.val)
-        if symbol is not None and isinstance(symbol, symboltable.ConstantSymbol):
-            self.user_includes.add('periodic_table.h')
-            fname = functions[symbol.property.name]
-            return f'PeriodicTable::pte().get_element_by_name("{symbol.element.capitalize()}")->{fname}()'
+        if symbol is not None:
+            if isinstance(symbol, symboltable.ConstantSymbol):
+                self.user_includes.add('periodic_table.h')
+                fname = functions[symbol.property.name]
+                return f'PeriodicTable::pte().get_element_by_name("{symbol.element.capitalize()}")->{fname}()'
+            elif isinstance(symbol, symboltable.ParameterSymbol):
+                return f'parameters_->common()->parameter(common::{node.val})'
 
         return f'_{node.val}'
 
@@ -437,9 +441,9 @@ class Cpp(ast.ASTVisitor):
         elif node.name == 'bonded':
             self.required_features.add('RequiredFeatures::BOND_INFO')
             return f'molecule.bonded(_{node.args[0].val}, _{node.args[1].val})'
-        # TODO check with ChargeFW2
         elif node.name == 'bond_distance':
-            return f'molecule.bond_distnance(_{node.args[0].val}, _{node.args[1].val}) == {node.args[2].val}'
+            self.required_features.add('RequiredFeatures::BOND_DISTANCES')
+            return f'molecule.bond_distance(_{node.args[0].val}, _{node.args[1].val}) == {node.args[2].val}'
 
     def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:
         return f'({self.visit(node.lhs)}) {node.op.value.lower()} ({self.visit(node.rhs)})'
