@@ -58,6 +58,36 @@ double {method_name}::{name}({args}) const {{
 
 substitution_prototype = 'double {name}({args}) const;'
 
+ee_prototype = 'Eigen::VectorXd ee_{number}({args}) const;'
+
+ee_template = '''\
+Eigen::VectorXd {method_name}::ee_{number}({args}) const {{
+    auto n = static_cast<int>(molecule.atoms().size());
+    Eigen::VectorXd b = Eigen::VectorXd::Zero(n + 1);
+    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n + 1, n + 1);
+    
+    for (const auto &_{idx_row}: molecule.atoms()) {{
+        size_t {idx_row} = _{idx_row}.index();
+        b({idx_row}) = {rhs};
+        for (const auto &_{idx_col}: molecule.atoms()) {{
+            size_t {idx_col} = _{idx_col}.index();
+            if ({idx_row} == {idx_col}) {{
+                A({idx_row}, {idx_row}) = {diag};
+            }} else {{
+                A({idx_row}, {idx_col}) = {off};
+            }}
+        }}
+    }}
+    
+    b(n) = molecule.total_charge();
+    A.row(n) = Eigen::VectorXd::Constant(n + 1, 1.0);
+    A.col(n) = Eigen::VectorXd::Constant(n + 1, 1.0);
+    A(n, n) = 0.0;
+    
+    return A.partialPivLu().solve(b).head(n);
+}}
+'''
+
 
 functions = {
     'electronegativity': 'electronegativity',
@@ -92,6 +122,7 @@ class Cpp(ast.ASTVisitor):
         self.defs: List[str] = []
         self.prototypes: List[str] = []
         self.sum_count: int = 0
+        self.ee_count: int = 0
 
         self.required_features: Set[str] = set()
 
@@ -453,3 +484,33 @@ class Cpp(ast.ASTVisitor):
 
     def visit_UnaryLogicalOp(self, node: ast.UnaryLogicalOp) -> str:
         return f'{node.op.value.lower()} ({self.visit(node.constraint)})'
+
+    def visit_EE(self, node: ast.EE) -> str:
+        number = self.ee_count
+        self.ee_count += 1
+
+        off_expr = self.visit(node.off)
+        diag_expr = self.visit(node.diag)
+        rhs_expr = self.visit(node.rhs)
+
+        args_str = 'molecule'
+        formal_args_str = 'const Molecule &molecule'
+
+        self.defs.append(ee_template.format(method_name=self.method_name,
+                                            number=number,
+                                            idx_row=node.idx_row,
+                                            idx_col=node.idx_col,
+                                            diag=diag_expr,
+                                            off=off_expr,
+                                            rhs=rhs_expr,
+                                            args=formal_args_str))
+
+        self.prototypes.append(ee_prototype.format(number=number,
+                                                   args=formal_args_str))
+
+        return f'ee_{number}({args_str})'
+
+    def visit_Function(self, node: ast.Function) -> str:
+        self.sys_includes.add('cmath')
+        arg = self.visit(node.arg)
+        return f'{node.name}({arg})'

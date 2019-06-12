@@ -1,5 +1,4 @@
 #include <vector>
-#include <cmath>
 #include <Eigen/Dense>
 {sys_includes}
 
