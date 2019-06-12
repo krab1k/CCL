@@ -4,9 +4,8 @@
 {sys_includes}
 
 #include "structures/molecule.h"
-#include "parameters.h"
 #include "ccl_method.h"
-#include "geometry.h"
+{user_includes}
 
 {defs}
 

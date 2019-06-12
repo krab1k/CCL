@@ -17,6 +17,8 @@ with open('ccl/generators/cpp/templates/CMakeLists.txt') as f:
 
 sys_include_template = '#include <{file}>'
 
+user_include_template = '#include "{file}"'
+
 for_template = '''\
 for (int {i} = {init}; {i} <= {to}; {i}++) {{
     {code}
@@ -83,6 +85,7 @@ class Cpp(ast.ASTVisitor):
         self.format_code: bool = kwargs['format_code'] if 'format_code' in kwargs else True
 
         self.sys_includes: Set[str] = set()
+        self.user_includes: Set[str] = set()
         self.var_definitions: Dict[str, str] = {}
         self.method_name: str = ''
 
@@ -143,10 +146,11 @@ class Cpp(ast.ASTVisitor):
         for statement in node.statements:
             code.append(self.visit(statement))
 
-        sys_includes = []
-        for file in self.sys_includes:
-            sys_includes.append(sys_include_template.format(file=file))
+        sys_includes = [sys_include_template.format(file=file) for file in self.sys_includes]
         sys_include_str = '\n'.join(sys_includes)
+
+        user_includes = [user_include_template.format(file=file) for file in self.user_includes]
+        user_include_str = '\n'.join(user_includes)
 
         code_str = '\n'.join(code)
 
@@ -158,6 +162,7 @@ class Cpp(ast.ASTVisitor):
 
         method = method_template.format(method_name=self.method_name,
                                         sys_includes=sys_include_str,
+                                        user_includes=user_include_str,
                                         defs=defs_str,
                                         var_definitions=var_defs_str,
                                         code=code_str)
@@ -215,7 +220,7 @@ class Cpp(ast.ASTVisitor):
             f.write(cmake_template.format(method_name=node.name))
 
         for file in ['ccl_method.cpp', 'ccl_method.h']:
-            args = ['clang-format', '-i', '-style={ColumnLimit: 0}', os.path.join(self.output_dir, file)]
+            args = ['clang-format', '-i', '-style={ColumnLimit: 120}', os.path.join(self.output_dir, file)]
             subprocess.run(args)
 
     def visit_Assign(self, node: ast.Assign) -> str:
@@ -300,19 +305,28 @@ class Cpp(ast.ASTVisitor):
 
         return f'{left} {node.op.value} {right}'
 
-    @staticmethod
-    def visit_Name(node: ast.Name) -> str:
+    def visit_Name(self, node: ast.Name) -> str:
+        symbol = self.symbol_table.resolve(node.val)
+        if symbol is not None and isinstance(symbol, symboltable.ConstantSymbol):
+            self.user_includes.add('periodic_table.h')
+            fname = functions[symbol.property.name]
+            return f'PeriodicTable::pte().get_element_by_name("{symbol.element.capitalize()}")->{fname}()'
+
         return f'_{node.val}'
 
     @staticmethod
     def visit_Number(node: ast.Number) -> str:
         return f'{node.val}'
 
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> str:
+        return f'{node.op.value} ({self.visit(node.expr)})'
+
     def visit_Subscript(self, node: ast.Subscript) -> str:
         name = node.name.val
         table = symboltable.SymbolTable.get_table_for_node(node)
         symbol = table.resolve(name)
         if isinstance(symbol, symboltable.ParameterSymbol):
+            self.user_includes.add('parameters.h')
             if symbol.type == ast.ParameterType.ATOM:
                 idx = self.visit(node.indices[0])
                 return f'parameters_->atom()->parameter(atom::{name})({idx})'
@@ -343,6 +357,7 @@ class Cpp(ast.ASTVisitor):
                 idx = self.visit(node.indices[0])
                 return f'{idx}.{functions[fname]}()'
             elif fname == 'distance':
+                self.user_includes.add('geometry.h')
                 idx1 = self.visit(node.indices[0])
                 idx2 = self.visit(node.indices[1])
                 return f'{functions[fname]}({idx1}, {idx2})'
@@ -431,3 +446,6 @@ class Cpp(ast.ASTVisitor):
 
     def visit_RelOp(self, node: ast.RelOp) -> str:
         return f'({self.visit(node.lhs)}) {node.op.value} ({self.visit(node.rhs)})'
+
+    def visit_UnaryLogicalOp(self, node: ast.UnaryLogicalOp) -> str:
+        return f'{node.op.value.lower()} ({self.visit(node.constraint)})'
