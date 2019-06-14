@@ -1,7 +1,9 @@
 name mgc
 
+g = 1.0
 for each atom i:
     X0[i] = E[i]
+    g = g * E[i]
     S[i, i] = 1
 done
 
@@ -16,7 +18,7 @@ done
 X = inv(S) * X0
 
 n = sum[k](1.0)
-Xm = sum[k](X[k]) ^ (1 / n)
+Xm = g ^ (1.0 / n)
 
 q = (X - X0) / Xm
 

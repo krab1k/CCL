@@ -332,7 +332,7 @@ class Cpp(ast.ASTVisitor):
             right = f'({right})'
 
         if isinstance(node.right.result_type, ast.ArrayType) and isinstance(node.left.result_type, ast.ArrayType) and \
-                node.left.result_type.dim() == 1:
+                node.left.result_type.dim() == 1 and node.op == ast.BinaryOp.Ops.MUL:
             left = f'{left}.transpose()'
 
         return f'{left} {node.op.value} {right}'
@@ -511,6 +511,9 @@ class Cpp(ast.ASTVisitor):
         return f'ee_{number}({args_str})'
 
     def visit_Function(self, node: ast.Function) -> str:
-        self.sys_includes.add('cmath')
         arg = self.visit(node.arg)
-        return f'{node.name}({arg})'
+        if node.name == 'inv':
+            return f'{arg}.inverse()'
+        else:
+            self.sys_includes.add('cmath')
+            return f'{node.name}({arg})'
