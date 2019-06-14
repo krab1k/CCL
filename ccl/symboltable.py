@@ -42,7 +42,7 @@ for prop in INT_ELEMENT_PROPERTIES | {'formal charge'}:
 
 # Add bond properties
 
-FUNCTIONS['order'] = Function('order', ast.FunctionType(ast.NumericType.INT, ast.ObjectType.BOND))
+FUNCTIONS['bond order'] = Function('bond order', ast.FunctionType(ast.NumericType.INT, ast.ObjectType.BOND))
 
 
 # Add custom functions

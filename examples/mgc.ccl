@@ -23,6 +23,6 @@ Xm = g ^ (1.0 / n)
 q = (X - X0) / Xm
 
 where
-bo is order
+bo is bond order
 E is electronegativity
 k is atom

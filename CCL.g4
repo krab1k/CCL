@@ -1,58 +1,50 @@
-grammar CCL;
+parser grammar CCL;
 
-method: 'name' method_name=NAME body+=statement+ ('where' annotations+=annotation+)? EOF;
+options { tokenVocab=CCL_Lexer; }
+
+method: NAME method_name=ID NL+ body+=statement+ (WHERE NL+ annotations+=annotation+)? EOF;
 statement: assign | for_loop | for_each;
-assign: lhs=var '=' rhs=expr;
-for_loop: 'for' identifier=NAME '=' value_from=number 'to' value_to=number ':' body+=statement+ 'done';
-for_each: 'for each' abtype=objtype identifier=NAME (bond_decomp)? ('such that' constraint)? ':' body+=statement+ 'done';
+assign: lhs=var EQ rhs=expr NL+;
+for_loop: FOR identifier=ID EQ value_from=number TO value_to=number COLON NL+ body+=statement+ DONE NL+;
+for_each: FOR_EACH abtype=objtype identifier=ID (bond_decomp)? (ST constraint)? COLON NL+ body+=statement+ DONE NL+;
 
-objtype: 'atom' | 'bond';
-bond_decomp: '=' '[' indices+=NAME ',' indices+=NAME ']';
+objtype: ATOM | BOND;
+bond_decomp: EQ LB indices+=ID COMMA indices+=ID RB;
 
-expr: <assoc=right> left=expr op='^' right=expr                 #BinOp
-    | op=('+' | '-') expr                                       #UnaryOp
-    | left=expr op=('*' | '/') right=expr                       #BinOp
-    | left=expr op=('+' | '-') right=expr                       #BinOp
-    | '(' expr ')'                                              #ParenOp
-    | 'sum' '[' identifier=NAME ']' '(' expr ')'                #SumOp
-    | 'EE' '[' idx_row=NAME ',' idx_col=NAME ']'
-      '(' diag=expr ',' off=expr ',' rhs=expr
-       (',' ee_type=('cutoff' | 'cover') radius=number)? ')'    #EEExpr
-    | fn=NAME '(' fn_arg=expr ')'                               #FnExpr
+expr: <assoc=right> left=expr op=POW right=expr                 #BinOp
+    | op=(ADD | SUB) expr                                       #UnaryOp
+    | left=expr op=(MUL | DIV) right=expr                       #BinOp
+    | left=expr op=(ADD | SUB) right=expr                       #BinOp
+    | LP expr RP                                                #ParenOp
+    | SUM LB identifier=ID RB LP expr RP                        #SumOp
+    | EE LB idx_row=ID COMMA idx_col=ID RB
+      LP diag=expr COMMA off=expr COMMA rhs=expr
+      (COMMA ee_type=(CUTOFF | COVER) radius=number)? RP        #EEExpr
+    | fn=ID LP fn_arg=expr RP                                   #FnExpr
     | var                                                       #VarExpr
     | number                                                    #NumberExpr
     ;
 
 var: basename | subscript;
-basename: name=NAME;
-subscript: name=NAME '[' indices+=NAME (',' indices+=NAME)? ']';
+basename: name=ID;
+subscript: name=ID LB indices+=ID (COMMA indices+=ID)? RB;
 
-annotation: var '=' expr ('if' constraint)?                                         #ExprAnnotation
-          | name=NAME 'is' ptype=('atom' | 'bond' | 'common') 'parameter'           #ParameterAnnotation
-          | name=NAME (bond_decomp)? 'is' abtype=objtype ('such that' constraint)?  #ObjectAnnotation
-          | name=NAME 'is' ptype+=NAME+ 'of' element=NAME                           #ConstantAnnotation
-          | name=NAME 'is' ptype+=NAME+                                             #PropertyAnnotation
+annotation: var EQ expr (IF constraint)? NL+                                  #ExprAnnotation
+          | name=ID IS ptype=(ATOM | BOND | COMMON) PARAMETER NL+             #ParameterAnnotation
+          | name=ID (bond_decomp)? IS abtype=objtype (ST constraint)? NL+     #ObjectAnnotation
+          | name=ID IS ptype+=names+ OF element=ID NL+                        #ConstantAnnotation
+          | name=ID IS ptype+=names+ NL+                                      #PropertyAnnotation
           ;
 
-constraint: left=constraint op=('and' | 'or') right=constraint                #AndOrConstraint
-           | 'not' constraint                                                 #NotConstraint
-           | '(' constraint ')'                                               #ParenConstraint
-           | left=expr op=('<' | '>' | '!=' | '==' | '<=' | '>=' ) right=expr #CompareConstraint
-           | pred=NAME '(' args+=arg (',' args+=arg )* ')'                    #PredicateConstraint
+constraint: left=constraint op=(AND | OR) right=constraint                  #AndOrConstraint
+           | NOT constraint                                                 #NotConstraint
+           | LP constraint RP                                               #ParenConstraint
+           | left=expr op=(LT| GT | NEQ | EQQ | LEQ | GEQ ) right=expr      #CompareConstraint
+           | pred=ID LP args+=arg (COMMA args+=arg )* RP                    #PredicateConstraint
            ;
 
 arg: basename | number;
+
+names: ID | ATOM | BOND;
+
 number: NUMBER;
-
-fragment NL: '\r'? '\n';
-fragment DIGIT: [0-9];
-fragment LETTER: [a-zA-Z];
-fragment ALPHA: DIGIT | LETTER | '_';
-
-COMMENT: '#' .*? NL -> skip;
-WS: [ \t\n] -> channel(HIDDEN);
-
-NUMBER: '-'? DIGIT+ ('.' DIGIT*)?;
-NAME: LETTER ALPHA*;
-
-ERROR_CHAR: .;

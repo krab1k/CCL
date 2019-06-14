@@ -1,163 +1,168 @@
 # Generated from /home/krab1k/Research/CCL/CCL.g4 by ANTLR 4.7.2
 from antlr4 import *
 if __name__ is not None and "." in __name__:
-    from .CCLParser import CCLParser
+    from .CCL import CCL
 else:
-    from CCLParser import CCLParser
+    from CCL import CCL
 
-# This class defines a complete generic visitor for a parse tree produced by CCLParser.
+# This class defines a complete generic visitor for a parse tree produced by CCL.
 
 class CCLVisitor(ParseTreeVisitor):
 
-    # Visit a parse tree produced by CCLParser#method.
-    def visitMethod(self, ctx:CCLParser.MethodContext):
+    # Visit a parse tree produced by CCL#method.
+    def visitMethod(self, ctx:CCL.MethodContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#statement.
-    def visitStatement(self, ctx:CCLParser.StatementContext):
+    # Visit a parse tree produced by CCL#statement.
+    def visitStatement(self, ctx:CCL.StatementContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#assign.
-    def visitAssign(self, ctx:CCLParser.AssignContext):
+    # Visit a parse tree produced by CCL#assign.
+    def visitAssign(self, ctx:CCL.AssignContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#for_loop.
-    def visitFor_loop(self, ctx:CCLParser.For_loopContext):
+    # Visit a parse tree produced by CCL#for_loop.
+    def visitFor_loop(self, ctx:CCL.For_loopContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#for_each.
-    def visitFor_each(self, ctx:CCLParser.For_eachContext):
+    # Visit a parse tree produced by CCL#for_each.
+    def visitFor_each(self, ctx:CCL.For_eachContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#objtype.
-    def visitObjtype(self, ctx:CCLParser.ObjtypeContext):
+    # Visit a parse tree produced by CCL#objtype.
+    def visitObjtype(self, ctx:CCL.ObjtypeContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#bond_decomp.
-    def visitBond_decomp(self, ctx:CCLParser.Bond_decompContext):
+    # Visit a parse tree produced by CCL#bond_decomp.
+    def visitBond_decomp(self, ctx:CCL.Bond_decompContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#UnaryOp.
-    def visitUnaryOp(self, ctx:CCLParser.UnaryOpContext):
+    # Visit a parse tree produced by CCL#UnaryOp.
+    def visitUnaryOp(self, ctx:CCL.UnaryOpContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#SumOp.
-    def visitSumOp(self, ctx:CCLParser.SumOpContext):
+    # Visit a parse tree produced by CCL#SumOp.
+    def visitSumOp(self, ctx:CCL.SumOpContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#ParenOp.
-    def visitParenOp(self, ctx:CCLParser.ParenOpContext):
+    # Visit a parse tree produced by CCL#ParenOp.
+    def visitParenOp(self, ctx:CCL.ParenOpContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#NumberExpr.
-    def visitNumberExpr(self, ctx:CCLParser.NumberExprContext):
+    # Visit a parse tree produced by CCL#NumberExpr.
+    def visitNumberExpr(self, ctx:CCL.NumberExprContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#VarExpr.
-    def visitVarExpr(self, ctx:CCLParser.VarExprContext):
+    # Visit a parse tree produced by CCL#VarExpr.
+    def visitVarExpr(self, ctx:CCL.VarExprContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#BinOp.
-    def visitBinOp(self, ctx:CCLParser.BinOpContext):
+    # Visit a parse tree produced by CCL#BinOp.
+    def visitBinOp(self, ctx:CCL.BinOpContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#EEExpr.
-    def visitEEExpr(self, ctx:CCLParser.EEExprContext):
+    # Visit a parse tree produced by CCL#EEExpr.
+    def visitEEExpr(self, ctx:CCL.EEExprContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#FnExpr.
-    def visitFnExpr(self, ctx:CCLParser.FnExprContext):
+    # Visit a parse tree produced by CCL#FnExpr.
+    def visitFnExpr(self, ctx:CCL.FnExprContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#var.
-    def visitVar(self, ctx:CCLParser.VarContext):
+    # Visit a parse tree produced by CCL#var.
+    def visitVar(self, ctx:CCL.VarContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#basename.
-    def visitBasename(self, ctx:CCLParser.BasenameContext):
+    # Visit a parse tree produced by CCL#basename.
+    def visitBasename(self, ctx:CCL.BasenameContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#subscript.
-    def visitSubscript(self, ctx:CCLParser.SubscriptContext):
+    # Visit a parse tree produced by CCL#subscript.
+    def visitSubscript(self, ctx:CCL.SubscriptContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#ExprAnnotation.
-    def visitExprAnnotation(self, ctx:CCLParser.ExprAnnotationContext):
+    # Visit a parse tree produced by CCL#ExprAnnotation.
+    def visitExprAnnotation(self, ctx:CCL.ExprAnnotationContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#ParameterAnnotation.
-    def visitParameterAnnotation(self, ctx:CCLParser.ParameterAnnotationContext):
+    # Visit a parse tree produced by CCL#ParameterAnnotation.
+    def visitParameterAnnotation(self, ctx:CCL.ParameterAnnotationContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#ObjectAnnotation.
-    def visitObjectAnnotation(self, ctx:CCLParser.ObjectAnnotationContext):
+    # Visit a parse tree produced by CCL#ObjectAnnotation.
+    def visitObjectAnnotation(self, ctx:CCL.ObjectAnnotationContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#ConstantAnnotation.
-    def visitConstantAnnotation(self, ctx:CCLParser.ConstantAnnotationContext):
+    # Visit a parse tree produced by CCL#ConstantAnnotation.
+    def visitConstantAnnotation(self, ctx:CCL.ConstantAnnotationContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#PropertyAnnotation.
-    def visitPropertyAnnotation(self, ctx:CCLParser.PropertyAnnotationContext):
+    # Visit a parse tree produced by CCL#PropertyAnnotation.
+    def visitPropertyAnnotation(self, ctx:CCL.PropertyAnnotationContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#ParenConstraint.
-    def visitParenConstraint(self, ctx:CCLParser.ParenConstraintContext):
+    # Visit a parse tree produced by CCL#ParenConstraint.
+    def visitParenConstraint(self, ctx:CCL.ParenConstraintContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#AndOrConstraint.
-    def visitAndOrConstraint(self, ctx:CCLParser.AndOrConstraintContext):
+    # Visit a parse tree produced by CCL#AndOrConstraint.
+    def visitAndOrConstraint(self, ctx:CCL.AndOrConstraintContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#PredicateConstraint.
-    def visitPredicateConstraint(self, ctx:CCLParser.PredicateConstraintContext):
+    # Visit a parse tree produced by CCL#PredicateConstraint.
+    def visitPredicateConstraint(self, ctx:CCL.PredicateConstraintContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#NotConstraint.
-    def visitNotConstraint(self, ctx:CCLParser.NotConstraintContext):
+    # Visit a parse tree produced by CCL#NotConstraint.
+    def visitNotConstraint(self, ctx:CCL.NotConstraintContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#CompareConstraint.
-    def visitCompareConstraint(self, ctx:CCLParser.CompareConstraintContext):
+    # Visit a parse tree produced by CCL#CompareConstraint.
+    def visitCompareConstraint(self, ctx:CCL.CompareConstraintContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#arg.
-    def visitArg(self, ctx:CCLParser.ArgContext):
+    # Visit a parse tree produced by CCL#arg.
+    def visitArg(self, ctx:CCL.ArgContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by CCLParser#number.
-    def visitNumber(self, ctx:CCLParser.NumberContext):
+    # Visit a parse tree produced by CCL#names.
+    def visitNames(self, ctx:CCL.NamesContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by CCL#number.
+    def visitNumber(self, ctx:CCL.NumberContext):
         return self.visitChildren(ctx)
 
 
 
-del CCLParser
+del CCL

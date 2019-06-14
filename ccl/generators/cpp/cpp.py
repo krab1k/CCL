@@ -99,7 +99,7 @@ functions = {
     'atomic number': 'Z',
     'valence electron count': 'valence_electron_count',
     'formal charge': 'formal_charge',
-    'order': 'order',
+    'bond order': 'order',
     'distance': 'distance'
 }
 
@@ -388,7 +388,7 @@ class Cpp(ast.ASTVisitor):
             if fname in symboltable.ELEMENT_PROPERTIES:
                 idx = self.visit(node.indices[0])
                 return f'{idx}.element().{functions[fname]}()'
-            elif fname in {'formal charge', 'order'}:
+            elif fname in {'formal charge', 'bond order'}:
                 idx = self.visit(node.indices[0])
                 return f'{idx}.{functions[fname]}()'
             elif fname == 'distance':
@@ -407,7 +407,7 @@ class Cpp(ast.ASTVisitor):
 
         object_name = node.name.val
 
-        used_names = set()
+        used_names: Set[str] = set()
         used_names |= ast.NameGetter().visit(node.expr)
 
         symbol = self.symbol_table.parent.resolve(object_name)
@@ -475,6 +475,8 @@ class Cpp(ast.ASTVisitor):
         elif node.name == 'bond_distance':
             self.required_features.add('RequiredFeatures::BOND_DISTANCES')
             return f'molecule.bond_distance(_{node.args[0].val}, _{node.args[1].val}) == {node.args[2].val}'
+        else:
+            raise RuntimeError('We should not get here')
 
     def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:
         return f'({self.visit(node.lhs)}) {node.op.value.lower()} ({self.visit(node.rhs)})'

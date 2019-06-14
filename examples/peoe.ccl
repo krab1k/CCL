@@ -5,10 +5,7 @@ for alpha = 0 to 6:
     done
 
     for each atom i:
-        q[i] = q[i] + (
-                        sum[j]((chi[j] - chi[i]) / d[i]) +
-                        sum[k]((chi[k] - chi[i]) / d[k])
-                      ) * 0.5 ^ alpha
+        q[i] = q[i] + (sum[j]((chi[j] - chi[i]) / d[i]) + sum[k]((chi[k] - chi[i]) / d[k])) * 0.5 ^ alpha
     done
 done
 

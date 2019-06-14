@@ -14,9 +14,9 @@ a is atom parameter
 b is atom parameter
 c is atom parameter
 p is atom parameter
-alpha is common parameter
+aa is common parameter
 j is atom such that bonded(j, i)
 k is atom such that bond_distance(k, i, 2)
 l is atom such that bond_distance(l, i, 3)
 q0 is formal charge
-P[i] = p[i] * (1 + alpha * (q0[i] - q[i]))
+P[i] = p[i] * (1 + aa * (q0[i] - q[i]))
