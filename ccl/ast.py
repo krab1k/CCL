@@ -152,23 +152,6 @@ class ParentSetter:
                 self.visit(value)
 
 
-class NameGetter:
-    @classmethod
-    def visit(cls, node: ASTNode) -> Set[str]:
-        names = set()
-        if isinstance(node, Name):
-            names.add(node.val)
-        for _, value in node:
-            if isinstance(value, list):
-                for item in value:
-                    if isinstance(item, ASTNode):
-                        names = names | cls.visit(item)
-            elif isinstance(value, ASTNode):
-                names = names | cls.visit(value)
-
-        return names
-
-
 class Statement(ASTNode):
     pass
 

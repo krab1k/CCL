@@ -2,9 +2,15 @@
 
 from typing import Dict, Tuple, Optional, Union, Set
 from abc import ABC, abstractmethod
+import os
 
 from ccl import ast
 from ccl.errors import CCLSymbolError, CCLTypeError
+
+ELEMENT_NAMES: Set[str] = set()
+with open(os.path.join('ccl', 'elements.txt')) as f:
+    for line in f:
+        ELEMENT_NAMES.add(line.strip().lower())
 
 
 class Function:
@@ -618,3 +624,30 @@ class SymbolTableBuilder(ast.ASTVisitor):
                     raise CCLTypeError(arg, f'Predicate {node.name} expected numeric argument.')
             else:
                 raise Exception('We should not get here!')
+
+        if f.name == 'element' and node.args[1].val.lower() not in ELEMENT_NAMES:
+            raise CCLTypeError(node.args[1], f'Unknown element {node.args[1].val}')
+
+
+class NameGetter:
+    @classmethod
+    def visit(cls, node: ast.ASTNode, table: SymbolTable) -> Set[str]:
+        names = set()
+        if isinstance(node, ast.Name):
+            if node.val.lower() not in ELEMENT_NAMES:
+                names.add(node.val)
+            symbol = table.resolve(node.val)
+            if symbol is not None and isinstance(symbol, SubstitutionSymbol):
+                for cond, expr in symbol.rules.items():
+                    if cond is not None:
+                        names |= cls.visit(cond, table)
+                    names |= cls.visit(expr, table)
+        for _, value in node:
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, ast.ASTNode):
+                        names = names | cls.visit(item, table)
+            elif isinstance(value, ast.ASTNode):
+                names = names | cls.visit(value, table)
+
+        return names

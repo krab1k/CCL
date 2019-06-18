@@ -126,13 +126,12 @@ class Cpp(ast.ASTVisitor):
 
         self.required_features: Set[str] = set()
 
+        self.substitutions_needing_q: Set[str] = set()
+
     def define_substitutions(self):
-        processed = set()
         table = self.symbol_table.parent
-        # TODO argument may be q as the globally defined symbol
         for name, symbol in table.symbols.items():
-            if isinstance(symbol, symboltable.SubstitutionSymbol) and name not in processed:
-                processed.add(name)
+            if isinstance(symbol, symboltable.SubstitutionSymbol):
                 if not symbol.indices:
                     args = ''
                     expr = self.visit(symbol.rules[None])
@@ -141,6 +140,18 @@ class Cpp(ast.ASTVisitor):
                     # TODO handle bonds
                     args = ','.join(('const Molecule &molecule',
                                      *(f'const Atom &_{name.val}' for name in symbol.indices)))
+
+                    # Check whether we have to add q as an argument
+                    required_names: Set[str] = set()
+                    for cond, expr in symbol.rules.items():
+                        if cond is not None:
+                            required_names |= symboltable.NameGetter.visit(cond, self.symbol_table)
+                        required_names |= symboltable.NameGetter.visit(expr, self.symbol_table)
+
+                    if 'q' in required_names:
+                        self.substitutions_needing_q.add(name)
+                        args += ', const Eigen::VectorXd _q'
+
                     if len(symbol.rules) == 1:
                         expr = self.visit(symbol.rules[None])
                         code = f'return {expr};'
@@ -382,6 +393,8 @@ class Cpp(ast.ASTVisitor):
                 return f'_{name}({idx1}.index(), {idx2}.index())'
         elif isinstance(symbol, symboltable.SubstitutionSymbol):
             args = ','.join(('molecule', *(f'_{name.val}' for name in node.indices)))
+            if symbol.name in self.substitutions_needing_q:
+                args += ', _q'
             return f'{symbol.name}({args})'
         elif isinstance(symbol, symboltable.FunctionSymbol):
             fname = symbol.function.name
@@ -408,14 +421,14 @@ class Cpp(ast.ASTVisitor):
         object_name = node.name.val
 
         used_names: Set[str] = set()
-        used_names |= ast.NameGetter().visit(node.expr)
+        used_names |= symboltable.NameGetter().visit(node.expr, self.symbol_table)
 
         symbol = self.symbol_table.parent.resolve(object_name)
 
         expr_str = self.visit(node.expr)
 
         if symbol.constraints is not None:
-            used_names |= ast.NameGetter().visit(symbol.constraints)
+            used_names |= symboltable.NameGetter().visit(symbol.constraints, self.symbol_table)
             code = constraint_template.format(constraint=self.visit(symbol.constraints),
                                               code=f's += {expr_str};')
         else:
@@ -442,6 +455,10 @@ class Cpp(ast.ASTVisitor):
 
                 formal_args.append(f'{type_str} _{name}')
                 args.append(f'_{name}')
+
+        if 'q' in used_names:
+            formal_args.append('const Eigen::VectorXd _q')
+            args.append('_q')
 
         formal_args_str = ', '.join(formal_args)
         args_str = ', '.join(args)
