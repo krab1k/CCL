@@ -89,9 +89,11 @@ class Latex(ast.ASTVisitor):
         right = self.visit(node.right)
 
         if node.op == ast.BinaryOp.Ops.MUL:
-            if not ast.is_atom(node.left) and not (isinstance(node.left, ast.BinaryOp) and node.left.op == ast.BinaryOp.Ops.POW):
+            if not ast.is_atom(node.left) and not (isinstance(node.left, ast.BinaryOp) and
+                                                   node.left.op == ast.BinaryOp.Ops.POW):
                 left = f'\\left({left}\\right)'
-            if not ast.is_atom(node.right) and not (isinstance(node.right, ast.BinaryOp) and node.right.op == ast.BinaryOp.Ops.POW):
+            if not ast.is_atom(node.right) and not (isinstance(node.right, ast.BinaryOp) and
+                                                    node.right.op == ast.BinaryOp.Ops.POW):
                 right = f'\\left({right}\\right)'
             op = ''
         elif node.op == ast.BinaryOp.Ops.DIV:

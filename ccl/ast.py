@@ -1,6 +1,6 @@
 """CCL's abstract syntax tree elements"""
 
-from typing import List, Union, Tuple, Optional, Set, Generator, Any
+from typing import List, Union, Tuple, Optional, Generator, Any
 from enum import Enum
 
 
@@ -118,7 +118,7 @@ class ASTNode:
         string = ', '.join(attr_value)
         return f'{self.__class__.__qualname__}({string})'
 
-    def __iter__(self) -> Generator[Tuple[str, str], None, None]:
+    def __iter__(self) -> Generator[Tuple[str, Any], None, None]:
         for attr in self.__dir__():
             yield attr, getattr(self, attr)
 

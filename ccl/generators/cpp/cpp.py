@@ -6,14 +6,14 @@ from ccl import ast, symboltable
 
 __all__ = ['Cpp']
 
-with open('ccl/generators/cpp/templates/method.h') as f:
-    header_template = f.read()
+with open('ccl/generators/cpp/templates/method.h') as template_f:
+    header_template = template_f.read()
 
-with open('ccl/generators/cpp/templates/method.cpp') as f:
-    method_template = f.read()
+with open('ccl/generators/cpp/templates/method.cpp') as template_f:
+    method_template = template_f.read()
 
-with open('ccl/generators/cpp/templates/CMakeLists.txt') as f:
-    cmake_template = f.read()
+with open('ccl/generators/cpp/templates/CMakeLists.txt') as template_f:
+    cmake_template = template_f.read()
 
 sys_include_template = '#include <{file}>'
 
@@ -495,8 +495,8 @@ class Cpp(ast.ASTVisitor):
         elif node.name == 'bond_distance':
             self.required_features.add('RequiredFeatures::BOND_DISTANCES')
             return f'molecule.bond_distance(_{node.args[0].val}, _{node.args[1].val}) == {node.args[2].val}'
-        else:
-            raise RuntimeError('We should not get here')
+
+        raise RuntimeError('We should not get here')
 
     def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:
         return f'({self.visit(node.lhs)}) {node.op.value.lower()} ({self.visit(node.rhs)})'

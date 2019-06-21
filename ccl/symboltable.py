@@ -8,8 +8,8 @@ from ccl import ast
 from ccl.errors import CCLSymbolError, CCLTypeError
 
 ELEMENT_NAMES: Set[str] = set()
-with open(os.path.join('ccl', 'elements.txt')) as f:
-    for line in f:
+with open(os.path.join('ccl', 'elements.txt')) as elements_file:
+    for line in elements_file:
         ELEMENT_NAMES.add(line.strip().lower())
 
 
@@ -348,8 +348,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 # Cannot assign Float to Int, OK otherwise
                 if lhs == ast.NumericType.INT and rhs == ast.NumericType.FLOAT:
                     return False
-                else:
-                    return True
+                return True
 
             return False
 
@@ -411,7 +410,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         def check_args(expected: ast.Type, given: ast.Type):
             if expected == given:
                 return True
-            elif given == ast.NumericType.INT and expected == ast.NumericType.FLOAT:
+            if given == ast.NumericType.INT and expected == ast.NumericType.FLOAT:
                 return True
 
             return False
@@ -450,23 +449,19 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 if ltype.dim() == rtype.dim() == 2:
                     if ltype.indices[1] != rtype.indices[0]:
                         raise CCLTypeError(node, f'Cannot multiply matrices of types {ltype} and {rtype}')
-                    else:
-                        node.result_type = ast.ArrayType(ltype.indices[0], rtype.indices[1])
+                    node.result_type = ast.ArrayType(ltype.indices[0], rtype.indices[1])
                 elif ltype.dim() == 1 and rtype.dim() == 2:
                     if ltype.indices[0] != rtype.indices[0]:
                         raise CCLTypeError(node, f'Cannot multiply vector of type {ltype} and matrix of type {rtype}')
-                    else:
-                        node.result_type = ast.ArrayType(rtype.indices[1])
+                    node.result_type = ast.ArrayType(rtype.indices[1])
                 elif ltype.dim() == 2 and rtype.dim() == 1:
                     if ltype.indices[1] != rtype.indices[0]:
                         raise CCLTypeError(node, f'Cannot multiply matrix of type {ltype} with vector of type {rtype}')
-                    else:
-                        node.result_type = ast.ArrayType(ltype.indices[0])
+                    node.result_type = ast.ArrayType(ltype.indices[0])
                 elif ltype.dim() == rtype.dim() == 1:
                     if ltype != rtype:
                         raise CCLTypeError(node, f'Cannot perform dot product of vectors of types {ltype} and {rtype}')
-                    else:
-                        node.result_type = ast.NumericType.FLOAT
+                    node.result_type = ast.NumericType.FLOAT
             else:
                 raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
         #  One is Array, second Number
@@ -474,7 +469,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 isinstance(rtype, (ast.ArrayType, ast.NumericType)):
             if node.op not in (ast.BinaryOp.Ops.MUL, ast.BinaryOp.Ops.DIV):
                 raise CCLTypeError(node, f'Cannot perform operation other than * or / between Number and Array.')
-            if node.op == ast.BinaryOp.Ops.DIV and isinstance(ltype, ast.NumericType) and isinstance(rtype, ast.ArrayType):
+            if node.op == ast.BinaryOp.Ops.DIV and isinstance(ltype, ast.NumericType) and \
+                    isinstance(rtype, ast.ArrayType):
                 raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
             if isinstance(ltype, ast.ArrayType):
                 node.result_type = ltype

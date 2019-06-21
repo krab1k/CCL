@@ -5,7 +5,7 @@ from .common import STYLES, SyntaxHighlighter
 
 
 class GraphvizHighlighter(SyntaxHighlighter):
-    braces = ['\[', '\]', '\{', '\}']
+    braces = [r'\[', r'\]', r'\{', r'\}']
     keywords = ['digraph', 'label']
     operators = ['=', '->']
 

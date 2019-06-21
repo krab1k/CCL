@@ -5,7 +5,7 @@ from .common import STYLES, SyntaxHighlighter
 
 
 class LatexHighlighter(SyntaxHighlighter):
-    braces = ['\{', '\}']
+    braces = [r'\{', r'\}']
 
     def __init__(self, document: QTextDocument) -> None:
         super().__init__(document)

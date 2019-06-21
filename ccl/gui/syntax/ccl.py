@@ -10,13 +10,13 @@ class CCLHighlighter(SyntaxHighlighter):
     keywords = ['to', 'such that', 'each', 'for', 'property', 'where', 'done', 'is', 'parameter', 'if',
                 'and', 'or', 'sum']
 
-    braces = ['\(', '\)', '\[', '\]']
+    braces = [r'\(', r'\)', r'\[', r'\]']
     operators = [
         '=',
         # Comparison
         '==', '!=', '<', '<=', '>', '>=',
         # Arithmetic
-        '\+', '-', '\*', '/', '\^'
+        r'\+', '-', r'\*', '/', r'\^'
     ]
 
     def __init__(self, document: QTextDocument) -> None:

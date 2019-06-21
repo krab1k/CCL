@@ -4,7 +4,7 @@ from typing import List, Union
 from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter
 
 
-def _format(color: Union[List[int], str], style: str= '') -> QTextCharFormat:
+def _format(color: Union[List[int], str], style: str = '') -> QTextCharFormat:
     """
     Return a QTextCharFormat with the given attributes.
     """
