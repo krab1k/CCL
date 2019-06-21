@@ -12,6 +12,17 @@ GREEK_LETTERS = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'T
 __all__ = ['Latex']
 
 
+latex_template = '''\
+\\documentclass{{article}}
+\\usepackage{{amsmath}}
+\\usepackage{{amssymb}}
+\\pagestyle{{empty}}
+\\begin{{document}}
+{code}
+\\end{{document}}
+'''
+
+
 def get_name(name: str) -> str:
     if name in GREEK_LETTERS or name.capitalize() in GREEK_LETTERS:
         return f'\\{name}'
@@ -26,6 +37,7 @@ class Latex(ast.ASTVisitor):
         self.depth: int = 0
         self.symbol_table: symboltable.SymbolTable = symbol_table
         self.inside_math: bool = True
+        self.full_output: bool = kwargs['full_output'] if 'full_output' in kwargs else False
 
     def visit(self, node: ast.ASTNode) -> str:  # Just to make mypy happy
         return str(super().visit(node))
@@ -37,7 +49,8 @@ class Latex(ast.ASTVisitor):
 
         return f'${plain_name}$'
 
-    def visit_Number(self, node: ast.Number) -> Union[int, float]:
+    @staticmethod
+    def visit_Number(node: ast.Number) -> Union[int, float]:
         return node.val
 
     def visit_For(self, node: ast.For) -> str:
@@ -111,7 +124,11 @@ class Latex(ast.ASTVisitor):
 
         self.inside_math = False
         annotations = self.visit_SymbolTable()
-        return f'\\noindent ${statements}$\n\n\\vspace*{{5mm}}\\noindent where\n\n\\noindent {annotations}'
+        if self.full_output:
+            code = f'\\noindent ${statements}$\n\n\\vspace*{{5mm}}\\noindent where\n\n\\noindent {annotations}'
+            return latex_template.format(code=code)
+        else:
+            return f'\\noindent ${statements}$\n\n\\vspace*{{5mm}}\\noindent where\n\n\\noindent {annotations}'
 
     def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:
         left = self.visit(node.lhs)
@@ -212,7 +229,7 @@ class Latex(ast.ASTVisitor):
                 if symbol.function.name == 'distance':
                     strings.append(f'${get_name(symbol.name)}_{{i, j}}$ is a distance between atoms $i$ and $j$')
                 else:
-                    strings.append(f'${get_name(symbol.name)}$ is {symbol.function.comment}')
+                    strings.append(f'${get_name(symbol.name)}$ is {symbol.function.name}')
         if atom_parameters:
             if len(atom_parameters) == 1:
                 strings.append(f'${get_name(atom_parameters[0].name)}$ is an atom parameter')
