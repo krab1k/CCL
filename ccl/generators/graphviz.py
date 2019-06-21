@@ -44,8 +44,10 @@ class Graphviz(ast.ASTVisitor):
         gn = GraphNode(0, 'Method')
         self.nodes.append(gn)
         self.current_node: GraphNode = gn
-        self.current_table_node: SymbolTableNode = SymbolTableNode(len(self.symbol_table_nodes) + 1,
-                                                                   table.parent.symbols)
+
+        assert table.parent is not None
+        self.current_table_node: SymbolTableNode = \
+            SymbolTableNode(len(self.symbol_table_nodes) + 1, table.parent.symbols)
         self.symbol_table_nodes.append(self.current_table_node)
 
         self.annotate_results: bool = False
@@ -63,6 +65,7 @@ class Graphviz(ast.ASTVisitor):
         self.current_node = gn
 
         if isinstance(node, (ast.For, ast.ForEach)):
+            assert node.symbol_table is not None
             st = SymbolTableNode(len(self.symbol_table_nodes) + 1, node.symbol_table.symbols)
             self.symbol_table_nodes.append(st)
             self.edges.append(f'node{self.current_node.idx} -> st_node{st.idx} [color=grey dir=none]')
@@ -106,6 +109,7 @@ class Graphviz(ast.ASTVisitor):
             self.edges.append('{rank=same; ' + '; '.join(same_level) + '}')
 
     def visit_Method(self, node: ast.Method) -> str:
+        assert node.symbol_table is not None
         st = SymbolTableNode(len(self.symbol_table_nodes) + 1, node.symbol_table.symbols)
         self.symbol_table_nodes.append(st)
         self.edges.append(f'node{self.current_node.idx} -> st_node{st.idx} [color=grey dir=none]')

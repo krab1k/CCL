@@ -143,6 +143,7 @@ class SymbolTable:
         if hasattr(node, 'symbol_table'):
             return node.symbol_table
 
+        assert node.parent is not None
         return cls.get_table_for_node(node.parent)
 
 
@@ -177,6 +178,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
             self.visit(statement)
 
     def visit_Parameter(self, node: ast.Parameter) -> None:
+        assert self.current_table.parent is not None
         self.current_table.parent.define(ParameterSymbol(node.name, node, node.type))
 
     def visit_Object(self, node: ast.Object) -> None:
@@ -440,6 +442,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
             self.visit(statement)
 
         self._iterating_over.remove(node.name.val)
+
+        assert self.current_table.parent is not None
         self.current_table = self.current_table.parent
 
     def visit_ForEach(self, node: ast.ForEach) -> None:
@@ -470,6 +474,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
             self.visit(statement)
 
         self._iterating_over -= atom_indices | {node.name.val}
+
+        assert self.current_table.parent is not None
         self.current_table = self.current_table.parent
 
     def visit_Sum(self, node: ast.Sum) -> None:
@@ -510,6 +516,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
             raise CCLTypeError(node, f'EE expression has to have all parts with Float type.')
 
         self._iterating_over -= {node.idx_row, node.idx_col}
+
+        assert self.current_table.parent is not None
         self.current_table = self.current_table.parent
 
         node.result_type = ArrayType(ObjectType.ATOM)

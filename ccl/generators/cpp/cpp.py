@@ -216,6 +216,8 @@ class Cpp(ast.ASTVisitor):
         bond_parameters = []
         common_parameters = []
 
+        assert self.symbol_table.parent is not None
+
         for name, symbol in self.symbol_table.parent.symbols.items():
             if isinstance(symbol, symboltable.ParameterSymbol):
                 if symbol.type == ParameterType.ATOM:
@@ -428,7 +430,11 @@ class Cpp(ast.ASTVisitor):
         used_names: Set[str] = set()
         used_names |= symboltable.NameGetter().visit(node.expr, self.symbol_table)
 
+        assert self.symbol_table.parent is not None
         symbol = self.symbol_table.parent.resolve(object_name)
+
+        assert symbol is not None
+        assert isinstance(symbol, symboltable.ObjectSymbol)
 
         expr_str = self.visit(node.expr)
 
