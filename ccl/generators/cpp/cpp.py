@@ -3,6 +3,8 @@ import subprocess
 from typing import Set, Dict, List
 
 from ccl import ast, symboltable
+from ccl.types import *
+from ccl.functions import ELEMENT_PROPERTIES
 
 __all__ = ['Cpp']
 
@@ -216,9 +218,9 @@ class Cpp(ast.ASTVisitor):
 
         for name, symbol in self.symbol_table.parent.symbols.items():
             if isinstance(symbol, symboltable.ParameterSymbol):
-                if symbol.type == ast.ParameterType.ATOM:
+                if symbol.type == ParameterType.ATOM:
                     atom_parameters.append(name)
-                elif symbol.type == ast.ParameterType.BOND:
+                elif symbol.type == ParameterType.BOND:
                     bond_parameters.append(name)
                 else:
                     common_parameters.append(name)
@@ -274,12 +276,12 @@ class Cpp(ast.ASTVisitor):
         name = node.lhs.val if isinstance(node.lhs, ast.Name) else node.lhs.name.val
         symbol = table.resolve(name)
         if symbol.name not in self.var_definitions:
-            if symbol.type == ast.NumericType.INT:
+            if symbol.type == NumericType.INT:
                 definition = f'int _{symbol.name} = 0;'
-            elif symbol.type == ast.NumericType.FLOAT:
+            elif symbol.type == NumericType.FLOAT:
                 definition = f'double _{symbol.name} = 0.0;'
-            else:  # ast.ArrayType
-                sizes = ', '.join('n' if t == ast.ObjectType.ATOM else 'm' for t in symbol.type.indices)
+            else:  # ArrayType
+                sizes = ', '.join('n' if t == ObjectType.ATOM else 'm' for t in symbol.type.indices)
                 if len(symbol.type.indices) == 1:
                     var_type = 'VectorXd'
                 else:
@@ -288,8 +290,8 @@ class Cpp(ast.ASTVisitor):
 
             self.var_definitions[symbol.name] = definition
 
-        if isinstance(node.lhs, ast.Name) and isinstance(symbol.type, ast.ArrayType) and \
-                isinstance(node.rhs.result_type, ast.NumericType):
+        if isinstance(node.lhs, ast.Name) and isinstance(symbol.type, ArrayType) and \
+                isinstance(node.rhs.result_type, NumericType):
             return f'{lhs}.fill({rhs});'
         else:
             return f'{lhs} = {rhs};'
@@ -331,7 +333,7 @@ class Cpp(ast.ASTVisitor):
         left = self.visit(node.left)
         right = self.visit(node.right)
 
-        if isinstance(node.left.result_type, ast.NumericType) and isinstance(node.right.result_type, ast.NumericType):
+        if isinstance(node.left.result_type, NumericType) and isinstance(node.right.result_type, NumericType):
             if node.op == ast.BinaryOp.Ops.POW:
                 self.sys_includes.add('cmath')
                 return f'pow({left}, {right})'
@@ -342,7 +344,7 @@ class Cpp(ast.ASTVisitor):
         if not ast.is_atom(node.right):
             right = f'({right})'
 
-        if isinstance(node.right.result_type, ast.ArrayType) and isinstance(node.left.result_type, ast.ArrayType) and \
+        if isinstance(node.right.result_type, ArrayType) and isinstance(node.left.result_type, ArrayType) and \
                 node.left.result_type.dim() == 1 and node.op == ast.BinaryOp.Ops.MUL:
             left = f'{left}.transpose()'
 
@@ -373,10 +375,10 @@ class Cpp(ast.ASTVisitor):
         symbol = table.resolve(name)
         if isinstance(symbol, symboltable.ParameterSymbol):
             self.user_includes.add('parameters.h')
-            if symbol.type == ast.ParameterType.ATOM:
+            if symbol.type == ParameterType.ATOM:
                 idx = self.visit(node.indices[0])
                 return f'parameters_->atom()->parameter(atom::{name})({idx})'
-            else:  # ast.ParameterType.BOND
+            else:  # ParameterType.BOND
                 if len(node.indices) == 1:
                     idx = self.visit(node.indices[0])
                     return f'parameters_->bond()->parameter(bond::{name})({idx})'
@@ -401,7 +403,7 @@ class Cpp(ast.ASTVisitor):
             return f'{symbol.name}({args})'
         elif isinstance(symbol, symboltable.FunctionSymbol):
             fname = symbol.function.name
-            if fname in symboltable.ELEMENT_PROPERTIES:
+            if fname in ELEMENT_PROPERTIES:
                 idx = self.visit(node.indices[0])
                 return f'{idx}.element().{functions[fname]}()'
             elif fname in {'formal charge', 'bond order'}:
@@ -438,10 +440,10 @@ class Cpp(ast.ASTVisitor):
             code = f's += {expr_str};'
 
         types = {
-            ast.NumericType.INT: 'int',
-            ast.NumericType.FLOAT: 'double',
-            ast.ObjectType.ATOM: 'const Atom &',
-            ast.ObjectType.BOND: 'const Bond &',
+            NumericType.INT: 'int',
+            NumericType.FLOAT: 'double',
+            ObjectType.ATOM: 'const Atom &',
+            ObjectType.BOND: 'const Bond &',
         }
 
         formal_args = ['const Molecule &molecule']
@@ -451,7 +453,7 @@ class Cpp(ast.ASTVisitor):
             s = self.symbol_table.parent.resolve(name)
             if s is None:
                 local_symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(name)
-                if isinstance(local_symbol.type, ast.ArrayType):
+                if isinstance(local_symbol.type, ArrayType):
                     type_str = 'const Eigen::MatrixXd &'
                 else:
                     type_str = types[local_symbol.type]
@@ -466,9 +468,9 @@ class Cpp(ast.ASTVisitor):
         formal_args_str = ', '.join(formal_args)
         args_str = ', '.join(args)
 
-        if symbol.type == ast.ObjectType.ATOM:
+        if symbol.type == ObjectType.ATOM:
             objects = 'molecule.atoms()'
-        else:  # ast.ObjectType.BOND:
+        else:  # ObjectType.BOND:
             objects = 'molecule.bonds()'
 
         self.prototypes.append(sum_prototype.format(number=number,

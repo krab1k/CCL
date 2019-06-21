@@ -26,7 +26,6 @@ class CCLErrorListener(ErrorListener):
 class Parser(CCLVisitor):
     def __init__(self) -> None:
         super().__init__()
-        self._name_handling: ast.VarContext = ast.VarContext.STORE
 
     @staticmethod
     def get_pos(ctx: Union[antlr4.ParserRuleContext, CommonToken]) -> Tuple[int, int]:
@@ -99,7 +98,6 @@ class Parser(CCLVisitor):
         return ast.Predicate(self.get_pos(ctx), name, args)
 
     def visitExprAnnotation(self, ctx: CCL_Parser.CCL.ExprAnnotationContext) -> ast.Substitution:
-        self._name_handling = ast.VarContext.LOAD
         lhs = self.visit(ctx.var())
         rhs = self.visit(ctx.expr())
         if ctx.constraint() is not None:
@@ -107,14 +105,11 @@ class Parser(CCLVisitor):
         else:
             constraint = None
 
-        self._name_handling = ast.VarContext.STORE
         return ast.Substitution(self.get_pos(ctx), lhs, rhs, constraint)
 
     def visitAssign(self, ctx: CCL_Parser.CCL.AssignContext) -> ast.Assign:
         var = self.visit(ctx.lhs)
-        self._name_handling = ast.VarContext.LOAD
         expr = self.visit(ctx.rhs)
-        self._name_handling = ast.VarContext.STORE
         return ast.Assign(self.get_pos(ctx), var, expr)
 
     def visitBinOp(self, ctx: CCL_Parser.CCL.BinOpContext) -> ast.BinaryOp:
@@ -136,17 +131,17 @@ class Parser(CCLVisitor):
         return ast.Number(self.get_pos(ctx), val, ntype)
 
     def visitBasename(self, ctx: CCL_Parser.CCL.BasenameContext) -> ast.Name:
-        return ast.Name(self.get_pos(ctx), ctx.name.text, self._name_handling)
+        return ast.Name(self.get_pos(ctx), ctx.name.text)
 
     def visitSubscript(self, ctx: CCL_Parser.CCL.SubscriptContext) -> ast.Subscript:
-        name = ast.Name(self.get_pos(ctx.name), ctx.name.text, self._name_handling)
+        name = ast.Name(self.get_pos(ctx.name), ctx.name.text)
         indices = []
         for idx in ctx.indices:
-            indices.append(ast.Name(self.get_pos(idx), idx.text, ast.VarContext.LOAD))
-        return ast.Subscript(self.get_pos(ctx), name, indices, self._name_handling)
+            indices.append(ast.Name(self.get_pos(idx), idx.text))
+        return ast.Subscript(self.get_pos(ctx), name, indices)
 
     def visitSumOp(self, ctx: CCL_Parser.CCL.SumOpContext) -> ast.Sum:
-        name = ast.Name(self.get_pos(ctx.identifier), ctx.identifier.text, ast.VarContext.LOAD)
+        name = ast.Name(self.get_pos(ctx.identifier), ctx.identifier.text)
         expr = self.visit(ctx.expr())
         return ast.Sum(self.get_pos(ctx), name, expr)
 
@@ -158,7 +153,7 @@ class Parser(CCLVisitor):
         return ast.UnaryOp(self.get_pos(ctx), ast.UnaryOp.Ops.NEG, expr)
 
     def visitFor_loop(self, ctx: CCL_Parser.CCL.For_loopContext) -> ast.For:
-        name = ast.Name(self.get_pos(ctx.identifier), ctx.identifier.text, ast.VarContext.STORE)
+        name = ast.Name(self.get_pos(ctx.identifier), ctx.identifier.text)
         value_from = self.visit(ctx.value_from)
         value_to = self.visit(ctx.value_to)
         body = []
@@ -167,7 +162,7 @@ class Parser(CCLVisitor):
         return ast.For(self.get_pos(ctx), name, value_from, value_to, body)
 
     def visitFor_each(self, ctx: CCL_Parser.CCL.For_eachContext) -> ast.ForEach:
-        name = ast.Name(self.get_pos(ctx.identifier), ctx.identifier.text, ast.VarContext.STORE)
+        name = ast.Name(self.get_pos(ctx.identifier), ctx.identifier.text)
         object_type = ast.ObjectType(self.visit(ctx.abtype).capitalize())
         if ctx.constraint() is not None:
             constraint = self.visit(ctx.constraint())
