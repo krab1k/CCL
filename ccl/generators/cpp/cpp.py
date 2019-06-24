@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import Set, Dict, List
+from typing import Set, Dict, List, Optional
 
 from ccl import ast, symboltable
 from ccl.types import *
@@ -109,12 +109,9 @@ functions = {
 class Cpp(ast.ASTVisitor):
     def __init__(self, symbol_table: symboltable.SymbolTable, **kwargs):
         self.symbol_table: symboltable.SymbolTable = symbol_table
-        if 'output_dir' in kwargs:
-            self.output_dir: str = kwargs['output_dir']
-        else:
-            raise Exception('No output dir provided')
 
-        self.format_code: bool = kwargs['format_code'] if 'format_code' in kwargs else True
+        self.output_dir: Optional[str] = kwargs.get('output_dir', None)
+        self.format_code: bool = kwargs.get('format_code', True)
 
         self.sys_includes: Set[str] = set()
         self.user_includes: Set[str] = set()
@@ -181,7 +178,7 @@ class Cpp(ast.ASTVisitor):
                                                               args=args,
                                                               code=code))
 
-    def visit_Method(self, node: ast.Method) -> None:
+    def visit_Method(self, node: ast.Method) -> str:
 
         self.method_name = node.name.capitalize()
 
@@ -257,18 +254,24 @@ class Cpp(ast.ASTVisitor):
                                         prototypes=prototypes_str,
                                         required_features=required_features_str)
 
-        with open(os.path.join(self.output_dir, 'ccl_method.cpp'), 'w') as f:
-            f.write(method)
+        if self.format_code:
+            args = ['clang-format', '-style={ColumnLimit: 120}']
+            p = subprocess.run(args, input=header.encode('ascii'), stdout=subprocess.PIPE)
+            header = p.stdout.decode('ascii')
+            p = subprocess.run(args, input=method.encode('ascii'), stdout=subprocess.PIPE)
+            method = p.stdout.decode('ascii')
 
-        with open(os.path.join(self.output_dir, 'ccl_method.h'), 'w') as f:
-            f.write(header)
+        if self.output_dir is not None:
+            with open(os.path.join(self.output_dir, 'ccl_method.cpp'), 'w') as f:
+                f.write(method)
 
-        with open(os.path.join(self.output_dir, 'CMakeLists.txt'), 'w') as f:
-            f.write(cmake_template.format(method_name=node.name))
+            with open(os.path.join(self.output_dir, 'ccl_method.h'), 'w') as f:
+                f.write(header)
 
-        for file in ['ccl_method.cpp', 'ccl_method.h']:
-            args = ['clang-format', '-i', '-style={ColumnLimit: 120}', os.path.join(self.output_dir, file)]
-            subprocess.run(args)
+            with open(os.path.join(self.output_dir, 'CMakeLists.txt'), 'w') as f:
+                f.write(cmake_template.format(method_name=node.name))
+
+        return f'// ccl_method.h\n\n{header}\n// ccl_method.cpp\n\n{method}'
 
     def visit_Assign(self, node: ast.Assign) -> str:
         lhs = self.visit(node.lhs)
