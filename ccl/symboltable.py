@@ -30,10 +30,7 @@ class ParameterSymbol(Symbol):
     def __repr__(self) -> str:
         return f'ParameterSymbol({self.name}, {self.type})'
 
-    def symbol_type(self) -> Union[ParameterType, NumericType]:
-        if self.type == ParameterType.COMMON:
-            return NumericType.FLOAT
-
+    def symbol_type(self) -> ParameterType:
         return self.type
 
 
@@ -221,7 +218,11 @@ class SymbolTableBuilder(ast.ASTVisitor):
         if s is not None:
             if isinstance(s, SubstitutionSymbol):
                 self.visit(s.rules[None])
-            node.result_type = s.symbol_type()
+            if s.symbol_type() == ParameterType.COMMON:
+                node.result_type = NumericType.FLOAT
+            else:
+                node.result_type = s.symbol_type()
+
         else:
             raise CCLSymbolError(node, f'Symbol {name} not defined.')
 
@@ -248,6 +249,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
                (symbol_type == ParameterType.BOND and
                     index_types not in [(ObjectType.BOND,), (ObjectType.ATOM, ObjectType.ATOM)]):
                 raise CCLTypeError(node, f'Cannot index parameter symbol of type {symbol_type} with {index_types_str}.')
+            if symbol_type == ParameterType.COMMON:
+                raise CCLTypeError(node, f'Cannot index common parameter.')
         elif isinstance(s, VariableSymbol) and isinstance(symbol_type, ArrayType):
             if symbol_type.indices != index_types:
                 raise CCLTypeError(node, f'Cannot index Array of type {symbol_type} '
