@@ -1,3 +1,5 @@
+"""Pytest LaTeX generator"""
+
 import pytest
 import tempfile
 import shutil
@@ -9,6 +11,7 @@ from ccl.errors import CCLCodeError
 
 
 def test_examples_latex(method):
+    """Check whether LaTeX generated code compiles successfully"""
     tmpdir = tempfile.mkdtemp()
     with open(f'examples/{method}') as f:
         data = f.read()

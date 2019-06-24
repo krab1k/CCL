@@ -1,3 +1,5 @@
+"""Pytest C++ generator"""
+
 import pytest
 import tempfile
 import subprocess
@@ -8,6 +10,7 @@ from ccl.errors import CCLCodeError
 
 
 def test_examples_cpp(method):
+    """Check whether C++ generated code compiles successfully"""
     tmpdir = tempfile.mkdtemp()
     with open(f'examples/{method}') as f:
         data = f.read()

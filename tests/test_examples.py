@@ -1,3 +1,5 @@
+"""Pytest common empirical methods"""
+
 import pytest
 
 from ccl import translate
@@ -5,6 +7,7 @@ from ccl.errors import CCLCodeError
 
 
 def test_examples(method):
+    """Check whether all example methods are valid in CCL"""
     with open(f'examples/{method}') as f:
         data = f.read()
     try:

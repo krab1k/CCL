@@ -1,39 +1,48 @@
+"""Types used in CCL"""
+
 from typing import Union, Tuple
 
 from ccl.common import NoValEnum
 
 
 class Type:
+    """Baseclass type"""
     pass
 
 
 class StringType(Type):
+    """String type"""
     def __repr__(self):
         return 'String'
 
 
 class BoolType(Type):
+    """Boolean type"""
     def __repr__(self):
         return 'Bool'
 
 
 class ObjectType(Type, NoValEnum):
+    """Type for atom or bond"""
     ATOM = 'Atom'
     BOND = 'Bond'
 
 
 class NumericType(Type, NoValEnum):
+    """Integer or floating point type"""
     INT = 'Int'
     FLOAT = 'Float'
 
 
 class ParameterType(Type, NoValEnum):
+    """Type for parameters"""
     ATOM = 'Atom Parameter'
     BOND = 'Bond Parameter'
     COMMON = 'Common Parameter'
 
 
 class ArrayType(Type):
+    """Type representing an array"""
     def __init__(self, *indices: ObjectType) -> None:
         self.indices: Tuple[ObjectType, ...] = indices
 
@@ -54,6 +63,7 @@ class ArrayType(Type):
 
 
 class FunctionType(Type):
+    """Function type"""
     def __init__(self, return_type: Union[BoolType, NumericType, ArrayType],
                  *args: Union[ObjectType, NumericType, ArrayType, StringType]) -> None:
         self.args: Tuple[Union[ObjectType, NumericType, ArrayType, StringType], ...] = args
@@ -73,6 +83,7 @@ class FunctionType(Type):
 
 
 class PredicateType(FunctionType):
+    """Functions returing boolean"""
     def __init__(self, *args: Union[ObjectType, NumericType, StringType]):
         super().__init__(BoolType(), *args)
 

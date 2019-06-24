@@ -1,4 +1,4 @@
-"""CCC's implementation of a symbol table"""
+"""CCL's implementation of a symbol table"""
 
 from typing import Dict, Optional, Set
 from abc import ABC, abstractmethod
@@ -11,6 +11,7 @@ from ccl.errors import CCLSymbolError, CCLTypeError
 
 
 class Symbol(ABC):
+    """Abstract class for every symbol"""
     @abstractmethod
     def __init__(self, name: str, def_node: Optional[ast.ASTNode]) -> None:
         self.name: str = name
@@ -103,6 +104,7 @@ class ConstantSymbol(Symbol):
 
 
 class SymbolTable:
+    """CCL's symbol table"""
     def __init__(self, parent: Optional['SymbolTable']) -> None:
         self.parent: Optional['SymbolTable'] = parent
         self.symbols: Dict[str, Symbol] = {}
@@ -149,6 +151,7 @@ class SymbolTable:
 
 # noinspection PyPep8Naming
 class SymbolTableBuilder(ast.ASTVisitor):
+    """Build symbol table from AST"""
     def __init__(self) -> None:
         super().__init__()
         self.global_table: SymbolTable = SymbolTable(None)
@@ -577,6 +580,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
 
 class NameGetter:
+    """Get all names used within a particular AST node"""
     @classmethod
     def visit(cls, node: ast.ASTNode, table: SymbolTable) -> Set[str]:
         names = set()

@@ -1,7 +1,10 @@
+"""Common functions defined in CCL"""
+
 from ccl.types import *
 
 
 class Function:
+    """General function class"""
     def __init__(self, name: str, fn_type: FunctionType) -> None:
         self.name: str = name
         self.type: FunctionType = fn_type

@@ -6,6 +6,7 @@ from ccl.ast import ASTNode
 
 
 class CCLError(Exception):
+    """General error in CCL code"""
     pass
 
 

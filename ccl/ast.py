@@ -7,6 +7,7 @@ from ccl.types import *
 
 
 class ASTNode:
+    """General AST node"""
     _fields = ()
     _internal = ('line', 'column', 'parent')
 
@@ -36,6 +37,7 @@ class ASTNode:
 
 
 class ASTVisitor:
+    """General visitor for AST"""
     def visit(self, node: ASTNode) -> Any:
         method = 'visit_' + node.__class__.__name__
         visitor = getattr(self, method, self.generic_visit)
@@ -52,6 +54,7 @@ class ASTVisitor:
 
 
 class ParentSetter:
+    """Set parent node for each node in AST"""
     def visit(self, node: ASTNode) -> None:
         for _, value in node:
             if isinstance(value, list):

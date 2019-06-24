@@ -1,9 +1,12 @@
+"""Common utility functions used within CCL"""
+
 import os
 from enum import Enum
 from typing import Set
 
 
 class NoValEnum(Enum):
+    """Enum with simplified text representation"""
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}.{self.name}'
 
