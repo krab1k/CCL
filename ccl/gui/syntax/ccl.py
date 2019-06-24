@@ -1,3 +1,5 @@
+"""Syntax highlighter for the CCL language."""
+
 from PyQt5.QtGui import QTextDocument
 from PyQt5.QtCore import QRegExp
 
@@ -5,10 +7,11 @@ from .common import STYLES, SyntaxHighlighter
 
 
 class CCLHighlighter(SyntaxHighlighter):
+    """Syntax highlighter for the CCL language."""
 
     types = ['atom', 'bond', 'common']
-    keywords = ['to', 'such that', 'each', 'for', 'property', 'where', 'done', 'is', 'parameter', 'if',
-                'and', 'or', 'sum']
+    keywords = ['parameter', 'such that', 'where', 'done', 'is', 'and', 'or', 'not', 'for each', 'for', 'to', 'if',
+                'of', 'sum', 'cutoff', 'cover', 'EE']
 
     braces = [r'\(', r'\)', r'\[', r'\]']
     operators = [

@@ -1,3 +1,5 @@
+"""Syntax highlighter for the Dot language."""
+
 from PyQt5.QtGui import QTextDocument
 from PyQt5.QtCore import QRegExp
 
@@ -5,6 +7,7 @@ from .common import STYLES, SyntaxHighlighter
 
 
 class GraphvizHighlighter(SyntaxHighlighter):
+    """Syntax highlighter for the Dot language."""
     braces = [r'\[', r'\]', r'\{', r'\}']
     keywords = ['digraph', 'label']
     operators = ['=', '->']

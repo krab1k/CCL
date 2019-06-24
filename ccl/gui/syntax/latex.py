@@ -1,3 +1,5 @@
+"""Syntax highlighter for the LaTeX language."""
+
 from PyQt5.QtGui import QTextDocument
 from PyQt5.QtCore import QRegExp
 
@@ -5,6 +7,7 @@ from .common import STYLES, SyntaxHighlighter
 
 
 class LatexHighlighter(SyntaxHighlighter):
+    """Syntax highlighter for the LaTeX language."""
     braces = [r'\{', r'\}']
 
     def __init__(self, document: QTextDocument) -> None:
