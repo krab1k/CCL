@@ -94,7 +94,7 @@ class Parser(CCLVisitor):
 
     def visitPredicateConstraint(self, ctx: CCL_Parser.CCL.PredicateConstraintContext) -> ast.Predicate:
         name = ctx.pred.text
-        args = [self.visit(arg) for arg in ctx.args]
+        args = tuple(self.visit(arg) for arg in ctx.args)
         return ast.Predicate(self.get_pos(ctx), name, args)
 
     def visitExprAnnotation(self, ctx: CCL_Parser.CCL.ExprAnnotationContext) -> ast.Substitution:

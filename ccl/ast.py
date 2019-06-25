@@ -68,15 +68,15 @@ class ParentSetter:
 
 
 class Statement(ASTNode):
-    pass
+    """Base class for every statement in CCL"""
 
 
 class Annotation(ASTNode):
-    pass
+    """Base class for every annotation in CCL"""
 
 
 class Constraint(ASTNode):
-    pass
+    """Base class for every constraint in CCL"""
 
 
 class Method(ASTNode):
@@ -89,11 +89,11 @@ class Method(ASTNode):
         self.name: str = name
 
     def print_ast(self) -> None:
-        for s in self.statements:
-            print(s)
+        for statement in self.statements:
+            print(statement)
 
-        for a in self.annotations:
-            print(a)
+        for annotation in self.annotations:
+            print(annotation)
 
 
 class Expression(ASTNode):
@@ -119,6 +119,15 @@ class Number(Expression):
     def __repr__(self) -> str:
         return f'Number({self.val})'
 
+    def __eq__(self, other):
+        if isinstance(other, Number):
+            return self.val == other.val and self.result_type == other.result_type
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.val) ^ hash(self.result_type)
+
 
 class Name(Expression):
     def __init__(self, pos: Tuple[int, int], name: str) -> None:
@@ -129,7 +138,13 @@ class Name(Expression):
         return f'Name({self.val})'
 
     def __eq__(self, other):
-        return self.val == other.val
+        if isinstance(other, Name):
+            return self.val == other.val
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.val)
 
 
 class BinaryOp(Expression):
@@ -241,6 +256,15 @@ class BinaryLogicalOp(Constraint):
         self.rhs: Constraint = rhs
         self.op: BinaryLogicalOp.Ops = op
 
+    def __eq__(self, other):
+        if isinstance(other, RelOp):
+            return self.lhs == other.lhs and self.rhs == self.rhs and self.op == other.op
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.lhs) ^ hash(self.rhs) ^ hash(self.op)
+
 
 class UnaryLogicalOp(Constraint):
     class Ops(NoValEnum):
@@ -250,6 +274,15 @@ class UnaryLogicalOp(Constraint):
         super().__init__(pos)
         self.op: UnaryLogicalOp.Ops = op
         self.constraint: Constraint = constraint
+
+    def __eq__(self, other):
+        if isinstance(other, UnaryLogicalOp):
+            return self.op == other.op and self.constraint == other.constraint
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.op) ^ hash(self.constraint)
 
 
 class RelOp(Constraint):
@@ -267,12 +300,30 @@ class RelOp(Constraint):
         self.rhs: Expression = rhs
         self.op: RelOp.Ops = op
 
+    def __eq__(self, other):
+        if isinstance(other, RelOp):
+            return self.lhs == other.lhs and self.rhs == self.rhs and self.op == other.op
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.lhs) ^ hash(self.rhs) ^ hash(self.op)
+
 
 class Predicate(Constraint):
-    def __init__(self, pos: Tuple[int, int], name: str, args: List[Union[Number, Name]]) -> None:
+    def __init__(self, pos: Tuple[int, int], name: str, args: Tuple[Union[Number, Name]]) -> None:
         super().__init__(pos)
         self.name: str = name
-        self.args: List[Union[Number, Name]] = args
+        self.args: Tuple[Union[Number, Name]] = args
+
+    def __eq__(self, other):
+        if isinstance(other, Predicate):
+            return self.name == other.name and self.args == other.args
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.name) ^ hash(self.args)
 
 
 class Parameter(Annotation):

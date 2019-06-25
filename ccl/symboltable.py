@@ -169,6 +169,13 @@ class SymbolTableBuilder(ast.ASTVisitor):
     def iterating_over(self) -> Set[str]:
         return {self._indices_mapping.get(i, i) for i in self._iterating_over}
 
+    def check_substitutions_default(self) -> None:
+        for symbol in self.global_table.symbols.values():
+            if isinstance(symbol, SubstitutionSymbol):
+                if None not in symbol.rules:
+                    raise CCLSymbolError(symbol.def_node,
+                                         f'No default option specified for Substitution symbol {symbol.name}.')
+
     def visit_Method(self, node: ast.Method) -> None:
         node.symbol_table = self.current_table
         for annotation in node.annotations:
@@ -176,6 +183,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         for statement in node.statements:
             self.visit(statement)
+
+        self.check_substitutions_default()
 
     def visit_Parameter(self, node: ast.Parameter) -> None:
         assert self.current_table.parent is not None
@@ -566,6 +575,9 @@ class SymbolTableBuilder(ast.ASTVisitor):
         for arg_type, arg in zip(f.type.args, node.args):
             if isinstance(arg_type, ObjectType):
                 self.visit(arg)
+                name = self._indices_mapping.get(arg.val, arg.val)
+                if name not in self.iterating_over:
+                    raise CCLSymbolError(arg, f'Symbol {arg.val} not bound to ForEach or Sum.')
                 if arg.result_type != arg_type:
                     raise CCLTypeError(arg, f'Predicate\'s {node.name} argument is not {arg_type}')
             elif isinstance(arg_type, StringType):
@@ -596,6 +608,7 @@ class NameGetter:
                     if cond is not None:
                         names |= cls.visit(cond, table)
                     names |= cls.visit(expr, table)
+                names -= {idx.val for idx in symbol.indices}
         for _, value in node:
             if isinstance(value, list):
                 for item in value:
