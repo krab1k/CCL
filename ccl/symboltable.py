@@ -562,6 +562,16 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 raise CCLTypeError(node, f'Same constraint already defined for symbol {s.name}.')
             s.rules[node.constraints] = node.rhs
 
+        used_names: Set[str] = set()
+        if node.constraints is not None:
+            used_names |= NameGetter().visit(node.constraints, self.global_table)
+        used_names |= NameGetter().visit(node.rhs, self.global_table)
+
+        for used_name in used_names:
+            symbol = self.global_table.resolve(used_name)
+            if isinstance(symbol, SubstitutionSymbol):
+                raise CCLSymbolError(node, f'Cannot nest substitution {used_name} in another {name}')
+
     def visit_Predicate(self, node: ast.Predicate) -> None:
         try:
             f = PREDICATES[node.name]
@@ -575,6 +585,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         for arg_type, arg in zip(f.type.args, node.args):
             if isinstance(arg_type, ObjectType):
                 self.visit(arg)
+                assert isinstance(arg, ast.Name)
                 name = self._indices_mapping.get(arg.val, arg.val)
                 if name not in self.iterating_over:
                     raise CCLSymbolError(arg, f'Symbol {arg.val} not bound to ForEach or Sum.')
