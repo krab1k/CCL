@@ -209,7 +209,10 @@ class SymbolTableBuilder(ast.ASTVisitor):
             raise CCLSymbolError(node, f'Property {node.prop} is not known.')
 
         if len(f.type.args) != 1 or f.type.args[0] != ObjectType.ATOM:
-            raise CCLTypeError(node, f'Function {node.prop} is not a property')
+            raise CCLTypeError(node, f'Function {node.prop} is not a property.')
+
+        if node.element not in ELEMENT_NAMES:
+            raise CCLSymbolError(node, f'Element {node.element} not known.')
 
         self.global_table.define(ConstantSymbol(node.name, node, f, node.element))
 
