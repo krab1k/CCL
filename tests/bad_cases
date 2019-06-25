@@ -1,10 +1,14 @@
-# Cannot assign number to vector
+# Cannot nest substitutions
+
 q = 1
+where
+d = 1
+m = 1 + d
 
 ===
 # For each has to have a object type specifier
 for each i:
-    x[i] = 1
+    q[i] = 1
 done
 
 ===
@@ -21,5 +25,23 @@ a = i
 for i = 0 to 5:
     i = 1
 done
+
+===
+# Incompatible types Atom + Float
+for each atom a:
+    q[a] = q[a] + a
+done
+
+===
+# Unknown element in constant expression
+q = c
+where
+c is electronegativity of adamantine
+
+===
+# Unknown property in constant expression
+q = c
+where
+c is stubbornness of hydrogen
 
 ===
