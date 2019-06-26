@@ -138,7 +138,7 @@ class Parser(CCLVisitor):
         indices = []
         for idx in ctx.indices:
             indices.append(ast.Name(self.get_pos(idx), idx.text))
-        return ast.Subscript(self.get_pos(ctx), name, indices)
+        return ast.Subscript(self.get_pos(ctx), name, tuple(indices))
 
     def visitSumOp(self, ctx: CCL_Parser.CCL.SumOpContext) -> ast.Sum:
         name = ast.Name(self.get_pos(ctx.identifier), ctx.identifier.text)

@@ -572,7 +572,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
     def visit_Substitution(self, node: ast.Substitution) -> None:
         if isinstance(node.lhs, ast.Name):
             name = node.lhs.val
-            indices = None
+            indices = tuple()
             if node.constraints is not None:
                 raise CCLSymbolError(node, f'Substitution symbol {name} cannot have a constraint.')
         else:  # ast.Subscript
@@ -580,9 +580,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
             indices = node.lhs.indices
 
         s = self.current_table.resolve(name)
-        indices = tuple(indices) if indices is not None else tuple()
         if s is None:
-            ns = SubstitutionSymbol(name, node, tuple(indices))
+            ns = SubstitutionSymbol(name, node, indices)
             self.global_table.define(ns)
             ns.rules[node.constraints] = node.rhs
         else:

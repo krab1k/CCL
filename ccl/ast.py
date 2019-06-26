@@ -56,7 +56,7 @@ class ASTVisitor:
 def set_parent_nodes(node: ASTNode) -> None:
     """Set parent node for each node in AST"""
     for _, value in node:
-        if isinstance(value, list):
+        if isinstance(value, (list, tuple)):
             for item in value:
                 if isinstance(item, ASTNode):
                     item.parent = node
@@ -206,10 +206,10 @@ class Sum(Expression):
 
 
 class Subscript(Expression):
-    def __init__(self, pos: Tuple[int, int], name: Name, indices: List[Name]) -> None:
+    def __init__(self, pos: Tuple[int, int], name: Name, indices: Tuple[Name, ...]) -> None:
         super().__init__(pos)
         self.name: Name = name
-        self.indices: List[Name] = indices
+        self.indices: Tuple[Name, ...] = indices
 
     def __repr__(self) -> str:
         indices_str = ', '.join(str(i) for i in self.indices)
