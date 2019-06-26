@@ -390,7 +390,6 @@ class Cpp(ast.ASTVisitor):
                 else:  # == 2
                     idx1 = self.visit(node.indices[0])
                     idx2 = self.visit(node.indices[1])
-                    # TODO We should check whether idx1 and idx2 are bonded or crash will occur
                     return f'parameters_->bond()->parameter(bond::{name})(*molecule.get_bond({idx1}, {idx2}))'
 
         elif isinstance(symbol, symboltable.VariableSymbol):

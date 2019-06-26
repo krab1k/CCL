@@ -12,6 +12,7 @@ from ccl.errors import CCLSymbolError, CCLTypeError
 
 class Symbol(ABC):
     """Abstract class for every symbol"""
+
     @abstractmethod
     def __init__(self, name: str, def_node: Optional[ast.ASTNode]) -> None:
         self.name: str = name
@@ -102,6 +103,7 @@ class ConstantSymbol(Symbol):
 
 class SymbolTable:
     """CCL's symbol table"""
+
     def __init__(self, parent: Optional['SymbolTable']) -> None:
         self.parent: Optional['SymbolTable'] = parent
         self.symbols: Dict[str, Symbol] = {}
@@ -149,6 +151,7 @@ class SymbolTable:
 # noinspection PyPep8Naming
 class SymbolTableBuilder(ast.ASTVisitor):
     """Build symbol table from AST"""
+
     def __init__(self) -> None:
         super().__init__()
         self.global_table: SymbolTable = SymbolTable(None)
@@ -257,10 +260,32 @@ class SymbolTableBuilder(ast.ASTVisitor):
         index_types_str = ', '.join(str(i) for i in index_types)
 
         if isinstance(s, ParameterSymbol):
-            if symbol_type == ParameterType.ATOM and index_types != (ObjectType.ATOM,) or \
-               (symbol_type == ParameterType.BOND and
-                    index_types not in [(ObjectType.BOND,), (ObjectType.ATOM, ObjectType.ATOM)]):
-                raise CCLTypeError(node, f'Cannot index parameter symbol of type {symbol_type} with {index_types_str}.')
+            if symbol_type == ParameterType.ATOM and index_types != (ObjectType.ATOM,):
+                raise CCLTypeError(node, f'Cannot index atom parameter with {index_types_str}.')
+            if symbol_type == ParameterType.BOND:
+                if index_types not in ((ObjectType.BOND,), (ObjectType.ATOM, ObjectType.ATOM)):
+                    raise CCLTypeError(node, f'Cannot index bond parameter with {index_types_str}.')
+
+                # Check whether two atoms are actually bonded, i.e., 'bonded' predicate exists
+                if index_types == (ObjectType.ATOM, ObjectType.ATOM):
+                    c1 = self.current_table.resolve(node.indices[0].val).constraints
+                    c2 = self.current_table.resolve(node.indices[1].val).constraints
+
+                    idx1 = node.indices[0].val
+                    idx2 = node.indices[1].val
+                    results: Set[Optional[ast.ASTNode]] = {None}
+                    for c in (c for c in (c1, c2) if c is not None):
+                        # Search for either bonded(i, j) or bonded(j, i)
+                        results.add(ast.search_ast_element(c, ast.Predicate((-1, -1), 'bonded',
+                                                                            (ast.Name((-1, -1), idx1),
+                                                                             ast.Name((-1, -1), idx2)))))
+                        results.add(ast.search_ast_element(c, ast.Predicate((-1, -1), 'bonded',
+                                                                            (ast.Name((-1, -1), idx2),
+                                                                             ast.Name((-1, -1), idx1)))))
+
+                    if results == {None}:
+                        raise CCLSymbolError(node, f'Cannot index bond parameter by two non-bonded atoms.')
+
             if symbol_type == ParameterType.COMMON:
                 raise CCLTypeError(node, f'Cannot index common parameter.')
         elif isinstance(s, VariableSymbol) and isinstance(symbol_type, ArrayType):
@@ -479,8 +504,12 @@ class SymbolTableBuilder(ast.ASTVisitor):
             if s1 is not None or s2 is not None:
                 raise CCLSymbolError(node, f'Decomposition of bond symbol {node.name.val} used already defined names.')
 
-            table.define(ObjectSymbol(i1, node, ObjectType.ATOM, None))
-            table.define(ObjectSymbol(i2, node, ObjectType.ATOM, None))
+            bonded_constraint = ast.Predicate((node.line, node.column), 'bonded', (
+                ast.Name((node.line, node.column), i1),
+                ast.Name((node.line, node.column), i2),
+            ))
+            table.define(ObjectSymbol(i1, node, ObjectType.ATOM, bonded_constraint))
+            table.define(ObjectSymbol(i2, node, ObjectType.ATOM, bonded_constraint))
             atom_indices = {i1, i2}
 
         self._iterating_over |= atom_indices | {node.name.val}
@@ -610,6 +639,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
 class NameGetter:
     """Get all names used within a particular AST node"""
+
     @classmethod
     def visit(cls, node: ast.ASTNode, table: SymbolTable) -> Set[str]:
         names = set()

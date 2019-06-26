@@ -48,7 +48,7 @@ class Parser(CCLVisitor):
             statements.append(self.visitStatement(statement))
 
         method = ast.Method(self.get_pos(ctx), name, statements, annotations)
-        ast.ParentSetter().visit(method)
+        ast.set_parent_nodes(method)
         return method
 
     def visitParameterAnnotation(self, ctx: CCL_Parser.CCL.ParameterAnnotationContext) -> ast.Parameter:

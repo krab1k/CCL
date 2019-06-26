@@ -53,18 +53,44 @@ class ASTVisitor:
                 self.visit(value)
 
 
-class ParentSetter:
+def set_parent_nodes(node: ASTNode) -> None:
     """Set parent node for each node in AST"""
-    def visit(self, node: ASTNode) -> None:
-        for _, value in node:
-            if isinstance(value, list):
-                for item in value:
-                    if isinstance(item, ASTNode):
-                        item.parent = node
-                        self.visit(item)
-            elif isinstance(value, ASTNode):
-                value.parent = node
-                self.visit(value)
+    for _, value in node:
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, ASTNode):
+                    item.parent = node
+                    set_parent_nodes(item)
+        elif isinstance(value, ASTNode):
+            value.parent = node
+            set_parent_nodes(value)
+
+
+def search_ast_element(node: ASTNode, query: ASTNode) -> Optional[ASTNode]:
+    """Search for a node in AST"""
+    if node == query:
+        return node
+
+    for _, value in node:
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                if isinstance(item, ASTNode):
+                    if item == query:
+                        return item
+                    else:
+                        res = search_ast_element(item, query)
+                        if res is not None:
+                            return res
+
+        elif isinstance(value, ASTNode):
+            if value == query:
+                return value
+            else:
+                res = search_ast_element(value, query)
+                if res is not None:
+                    return res
+
+    return None
 
 
 class Statement(ASTNode):
@@ -311,10 +337,10 @@ class RelOp(Constraint):
 
 
 class Predicate(Constraint):
-    def __init__(self, pos: Tuple[int, int], name: str, args: Tuple[Union[Number, Name]]) -> None:
+    def __init__(self, pos: Tuple[int, int], name: str, args: Tuple[Union[Number, Name], ...]) -> None:
         super().__init__(pos)
         self.name: str = name
-        self.args: Tuple[Union[Number, Name]] = args
+        self.args: Tuple[Union[Number, Name], ...] = args
 
     def __eq__(self, other):
         if isinstance(other, Predicate):
