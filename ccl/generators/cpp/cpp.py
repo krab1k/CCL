@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import Set, Dict, List, Optional, Any
+from typing import Set, Dict, Union, List, Optional
 
 from ccl import ast, symboltable
 from ccl.types import *
@@ -107,7 +107,7 @@ functions = {
 
 
 class Cpp(ast.ASTVisitor):
-    def __init__(self, symbol_table: symboltable.SymbolTable, **kwargs: Dict[str, Any]) -> None:
+    def __init__(self, symbol_table: symboltable.SymbolTable, **kwargs: Union[str, bool]) -> None:
         self.symbol_table: symboltable.SymbolTable = symbol_table
 
         self.output_dir: Optional[str] = kwargs.get('output_dir', None)

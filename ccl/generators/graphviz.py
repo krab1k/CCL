@@ -36,7 +36,7 @@ class SymbolTableNode:
 
 
 class Graphviz(ast.ASTVisitor):
-    def __init__(self, table: symboltable.SymbolTable, **kwargs: Dict[str, Any]) -> None:
+    def __init__(self, table: symboltable.SymbolTable, **kwargs: bool) -> None:
         super().__init__()
         self.nodes: List[GraphNode] = []
         self.symbol_table_nodes: List[SymbolTableNode] = []

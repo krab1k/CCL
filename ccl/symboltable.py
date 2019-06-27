@@ -141,7 +141,7 @@ class SymbolTable:
 
     @classmethod
     def get_table_for_node(cls, node: ast.ASTNode) -> 'SymbolTable':
-        if hasattr(node, 'symbol_table'):
+        if isinstance(node, ast.HasSymbolTable):
             return node.symbol_table
 
         assert node.parent is not None
@@ -498,7 +498,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         table = SymbolTable(self.current_table)
 
-        atom_indices = set()
+        atom_indices: Set[str] = set()
         if node.atom_indices is not None:
             i1, i2 = node.atom_indices
             s1 = self.current_table.resolve(i1)
@@ -574,7 +574,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
     def visit_Substitution(self, node: ast.Substitution) -> None:
         if isinstance(node.lhs, ast.Name):
             name = node.lhs.val
-            indices = tuple()
+            indices: Tuple[ast.Name, ...] = tuple()
             if node.constraints is not None:
                 raise CCLSymbolError(node, f'Substitution symbol {name} cannot have a constraint.')
         else:  # ast.Subscript

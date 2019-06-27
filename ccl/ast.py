@@ -1,10 +1,13 @@
 """CCL's abstract syntax tree elements"""
 
 from enum import Enum
-from typing import List, Optional, Generator, Any, Tuple, Union
+from typing import List, Optional, Iterator, Any, Tuple, Union, TYPE_CHECKING
 
 from ccl.types import *
 from ccl.common import NoValEnum
+
+if TYPE_CHECKING:
+    from ccl.symboltable import SymbolTable
 
 
 class ASTNode:
@@ -32,9 +35,14 @@ class ASTNode:
         string = ', '.join(attr_value)
         return f'{self.__class__.__qualname__}({string})'
 
-    def __iter__(self) -> Generator[Tuple[str, Any], None, None]:
+    def __iter__(self) -> Iterator[Tuple[str, Any]]:
         for attr in self.__dir__():
             yield attr, getattr(self, attr)
+
+
+class HasSymbolTable:
+    def __init__(self) -> None:
+        self.symbol_table: Optional[SymbolTable] = None
 
 
 class ASTVisitor:
@@ -106,13 +114,12 @@ class Constraint(ASTNode):
     """Base class for every constraint in CCL"""
 
 
-class Method(ASTNode):
+class Method(ASTNode, HasSymbolTable):
     def __init__(self, pos: Tuple[int, int], name: str, statements: List[Statement],
                  annotations: List[Annotation]) -> None:
         super().__init__(pos)
         self.statements: List[Statement] = statements
         self.annotations: List[Annotation] = annotations
-        self.symbol_table = None
         self.name: str = name
 
     def print_ast(self) -> None:
@@ -249,7 +256,7 @@ class Assign(Statement):
         self.rhs: Expression = rhs
 
 
-class For(Statement):
+class For(Statement, HasSymbolTable):
     def __init__(self, pos: Tuple[int, int], name: Name, value_from: Number, value_to: Number, body: List[Statement]) \
             -> None:
         super().__init__(pos)
@@ -257,10 +264,9 @@ class For(Statement):
         self.value_from: Number = value_from
         self.value_to: Number = value_to
         self.body: List[Statement] = body
-        self.symbol_table = None
 
 
-class ForEach(Statement):
+class ForEach(Statement, HasSymbolTable):
     def __init__(self, pos: Tuple[int, int], name: Name, otype: ObjectType, atom_indices: Optional[Tuple[str, str]],
                  constraints: Constraint, body: List[Statement]) -> None:
         super().__init__(pos)
@@ -269,7 +275,6 @@ class ForEach(Statement):
         self.atom_indices: Optional[Tuple[str, str]] = atom_indices
         self.constraints: Constraint = constraints
         self.body: List[Statement] = body
-        self.symbol_table = None
 
 
 class BinaryLogicalOp(Constraint):

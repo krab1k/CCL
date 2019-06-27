@@ -1,7 +1,8 @@
 """Syntax highlighter for the Dot language."""
 
-from PyQt5.QtGui import QTextDocument
+from PyQt5.QtGui import QTextDocument, QTextCharFormat
 from PyQt5.QtCore import QRegExp
+from typing import List, Tuple
 
 from .common import STYLES, SyntaxHighlighter
 
@@ -15,7 +16,7 @@ class GraphvizHighlighter(SyntaxHighlighter):
     def __init__(self, document: QTextDocument) -> None:
         super().__init__(document)
 
-        rules: list = []
+        rules: List[Tuple[str, int, QTextCharFormat]] = []
 
         rules += [(fr'{w}', 0, STYLES['keyword']) for w in self.keywords]
         rules += [(fr'{o}', 0, STYLES['operator']) for o in self.operators]
@@ -26,4 +27,4 @@ class GraphvizHighlighter(SyntaxHighlighter):
                   (r'label = <(.*)>', 1, STYLES['string']),
                   (r'\b[+-]?[0-9]+(?:\.[0-9]+)?\b', 0, STYLES['numbers'])]
 
-        self.rules: list = [(QRegExp(pat), index, fmt) for (pat, index, fmt) in rules]
+        self.rules = [(QRegExp(pat), index, fmt) for (pat, index, fmt) in rules]

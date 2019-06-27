@@ -1,7 +1,8 @@
 """Syntax highlighter for the C++ language."""
 
-from PyQt5.QtGui import QTextDocument
+from PyQt5.QtGui import QTextDocument, QTextCharFormat
 from PyQt5.QtCore import QRegExp
+from typing import List, Tuple
 
 from .common import STYLES, SyntaxHighlighter
 
@@ -46,7 +47,7 @@ class CppHighlighter(SyntaxHighlighter):
     def __init__(self, document: QTextDocument) -> None:
         super().__init__(document)
 
-        rules: list = []
+        rules: List[Tuple[str, int, QTextCharFormat]] = []
 
         # Keyword, operator, and brace rules
         rules += [(fr'\b{w}\b', 0, STYLES['keyword']) for w in self.keywords]
@@ -77,4 +78,4 @@ class CppHighlighter(SyntaxHighlighter):
         ]
 
         # Build a QRegExp for each pattern
-        self.rules: list = [(QRegExp(pat), index, fmt) for (pat, index, fmt) in rules]
+        self.rules = [(QRegExp(pat), index, fmt) for (pat, index, fmt) in rules]

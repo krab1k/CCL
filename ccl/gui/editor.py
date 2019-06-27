@@ -27,7 +27,7 @@ class Editor(QWidget):
         if initial_file is not None:
             self.load_file(initial_file)
 
-    def load_file(self, filename: str):
+    def load_file(self, filename: str) -> None:
         with open(filename) as f:
             data = f.read()
 
