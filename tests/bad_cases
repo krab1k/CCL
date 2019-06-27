@@ -196,9 +196,9 @@ done
 
 ===
 # Cannot index with something different than Atom or Bond.
-m[c] = 1
-where
-c is common parameter
+for i = 1 to 10:
+    m[i] = 1
+done
 
 ===
 # Function magic is not known.

@@ -368,6 +368,8 @@ class SymbolTableBuilder(ast.ASTVisitor):
             for idx in node.lhs.indices:
                 self.visit(idx)
                 index_types.append(idx.result_type)
+                if idx.val not in self._iterating_over:
+                    raise CCLSymbolError(idx, f'Object {idx.val} not bound to any For/ForEach/Sum.')
             if s is not None:
                 # Check whether indices are correct
                 if isinstance(s, SubstitutionSymbol):
