@@ -1,47 +1,414 @@
-# Cannot nest substitutions
-
+# Symbol a already defined.
 q = 1
 where
-d = 1
-m = 1 + d
+a is atom
+a is bond
 
 ===
-# For each has to have a object type specifier
-for each i:
-    q[i] = 1
+# No default option specified for Substitution symbol d.
+q = 1
+where
+d[i] = 1 if element(i, hydrogen)
+
+===
+# Decomposition of bond symbol b used already defined names.
+for each bond b = [i, j]:
+    q = 1
 done
+where
+i is atom
 
 ===
-# For loop control variables are local
-
-for i = 0 to 5:
-    a = 1
-done
-a = i
+# Property stubbornness is not known.
+q = 1
+where
+c is stubbornness of hydrogen
 
 ===
-# Cannot change for loop variable
-
-for i = 0 to 5:
-    i = 1
-done
-
-===
-# Incompatible types Atom + Float
-for each atom a:
-    q[a] = q[a] + a
-done
+# Function distance is not a property.
+q = 1
+where
+c is distance of hydrogen
 
 ===
-# Unknown element in constant expression
-q = c
+# Element adamantine not known.
+q = 1
 where
 c is electronegativity of adamantine
 
 ===
-# Unknown property in constant expression
-q = c
+# Function awesomeness is not known.
+q = 1
 where
-c is stubbornness of hydrogen
+c is awesomeness
+
+===
+# Symbol a not defined.
+q = a
+
+===
+# Object a not bound to any For/ForEach/Sum.
+q[a] = 1
+where
+a is atom
+
+===
+# Object b not bound to any For/ForEach/Sum.
+q = q[b]
+where
+b is atom
+
+===
+# Cannot index atom parameter with Bond.
+for each bond b:
+    q = p[b]
+done
+where
+p is atom parameter
+
+===
+# Cannot index bond parameter with Atom.
+for each atom a:
+    q[a] = p[a]
+done
+where
+p is bond parameter
+
+===
+# Cannot index bond parameter by two non-bonded atoms.
+for each atom a:
+    for each atom b:
+        q[a] = p[a, b]
+    done
+done
+where
+p is bond parameter
+
+===
+# Cannot index common parameter.
+for each atom a:
+    q[a] = c[a]
+done
+where
+c is common parameter
+
+===
+# Cannot index Array of type Float[Atom] using index/indices of type(s) Bond.
+for each bond b:
+    q[b] = 1
+done
+
+===
+# Cannot use function distance: Atom x Atom -> Float with arguments of type(s) Atom
+for each atom a:
+    q = d[a]
+done
+where
+d is distance
+
+===
+# Bad number of indices for d, got 2, expected 1.
+for each atom i:
+    for each atom j:
+        q = d[i, j]
+    done
+done
+where
+d[m] = 20
+
+===
+# Substitution indices for symbol d must have type Atom or Bond.
+q = d[p]
+where
+d[i] = 1
+p is common parameter
+
+===
+# All expressions within a substitution symbol d must have same type.
+for each atom a:
+    q = d[a]
+done
+where
+d[i] = 1 if element(i, hydrogen)
+d[i] = 1.1
+
+===
+# Cannot index type Int with indices of type(s) Atom
+x = 1
+for each atom a:
+    q = x[a]
+done
+
+===
+# Only Numbers and Arrays can be assigned not Bond Parameter.
+q = b
+where
+b is bond parameter
+
+===
+# Cannot assign to loop variable i.
+for i = 0 to 10:
+    i = 1
+done
+
+===
+# Cannot assign to a substitution symbol d.
+d = 2
+where
+d = 3
+
+===
+# Cannot assign to a parameter symbol p.
+p = 1
+where
+p is atom parameter
+
+===
+# Cannot assign Float[Atom] to the variable x of type Float[Atom, Atom].
+for each atom a:
+    for each atom b:
+        x[a, b] = 1
+    done
+done
+x = q
+
+===
+# Cannot assign to a substitution symbol k.
+for each atom a:
+    k[a] = 1
+done
+where
+k[i] = 15
+
+===
+# Cannot assign to non-Array type Common Parameter.
+for each atom a:
+    c[a] = 1
+done
+where
+c is common parameter
+
+===
+# Cannot index Array of type Float[Atom] using index/indices of type(s) Bond, Bond.
+for each bond b:
+    q[b, b] = 1
+done
+
+===
+# Cannot index with something different than Atom or Bond.
+m[c] = 1
+where
+c is common parameter
+
+===
+# Function magic is not known.
+q = magic(42)
+
+===
+# Incompatible argument type for function sin. Got Atom, expected Float.
+for each atom a:
+    q = sin(a)
+done
+
+===
+# Cannot perform + for types Float[Atom] and Float[Bond].
+for each bond b:
+    x[b] = 1
+done
+m = q + x
+
+===
+# Cannot multiply matrices of types Float[Bond, Bond] and Float[Atom, Atom].
+for each bond b:
+    x[b, b] = 1
+done
+
+for each atom a:
+    y[a, a] = 1
+done
+m = x * y
+
+===
+# Cannot multiply vector of type Float[Atom] and matrix of type Float[Bond, Bond].
+for each bond b:
+    x[b, b] = 1
+done
+m = q * x
+
+===
+# Cannot multiply matrix of type Float[Bond, Bond] with vector of type Float[Atom].
+for each bond b:
+    x[b, b] = 1
+done
+m = x * q
+
+===
+# Cannot perform dot product of vectors of types Float[Atom] and Float[Bond].
+for each bond b:
+    x[b] = 1
+done
+m = q * x
+
+===
+# Cannot perform ^ for types Float[Atom] and Float[Atom].
+m = q ^ q
+
+===
+# Cannot perform operation other than * or / between Number and Array.
+m = q + 1
+
+===
+# Cannot perform / for types Int and Float[Atom].
+a = 1
+m = a / q
+
+===
+# Cannot perform + for types Bond and Float.
+a = b + c
+where
+b is bond
+c is common parameter
+
+===
+# Loop variable i already defined.
+i = 1
+for i = 0 to 10:
+    q = 1
+done
+
+===
+# Loop variable a already defined.
+a = 1
+for each atom a:
+    q = 1
+done
+
+===
+# Decomposition of bond symbol b used already defined names.
+i = 1
+for each bond b = [i, j]:
+    q = 1
+done
+
+===
+# Symbol s not defined.
+q = sum[s](q[s])
+
+===
+# Sum has to iterate over Atom or Bond not Common Parameter.
+q = sum[c](1)
+where
+c is common parameter
+
+===
+# Index/indices for EE expression already defined.
+i = 1
+q = EE[i, j](1.0, 1.0, 1.0)
+
+===
+# EE expression has to have all parts with Float type.
+q = EE[i, j](1.0, 1.0, b)
+where
+b is bond
+
+===
+# Substitution symbol d cannot have a constraint.
+for each atom a:
+    q = d
+done
+where
+d = 2 if element(a, hydrogen)
+
+===
+# Symbol d already defined as something else.
+q = 1
+where
+d is atom
+d = 2
+
+===
+# Substitution symbol d has different indices defined.
+q = 1
+where
+d[i] = 1
+d[j] = 2
+
+===
+# Same constraint already defined for symbol d.
+q = 1
+where
+d[i] = 1
+d[i] = 2
+
+===
+# Cannot nest substitution m in another substitution d.
+q = 1
+where
+m = 3
+d = 1 + m
+
+===
+# Predicate love not defined.
+for each bond b = [a1, a2]:
+    q = 1 + d[a1, a2]
+done
+where
+d[i, j] = 1 if love(i, j)
+d[i, j] = 2
+
+===
+# Predicate near should have 3 arguments but got 1 instead.
+for each atom i:
+    q = d[i]
+done
+where
+d[i] = 1 if near(i)
+d[i] = 2
+
+===
+# Object a not bound to ForEach or Sum.
+for each atom i:
+    q = d[i]
+done
+where
+a is atom
+d[i] = 1 if near(i, a, 3)
+d[i] = 2
+
+===
+# Predicate's element argument is not Atom.
+for each bond b:
+    q[a] = d[b]
+done
+where
+d[i] = 1 if element(i, hydrogen)
+d[i] = 2
+
+===
+# Predicate element expected string argument.
+for each atom a:
+    q[a] = d[a]
+done
+where
+d[i] = 1 if element(i, 5)
+d[i] = 2
+
+===
+# Predicate near expected numeric argument.
+for each atom a:
+    q[a] = d[a]
+done
+where
+d[i] = 1 if near(i, i, i)
+d[i] = 2
+
+===
+# Unknown element adamantine.
+for each atom a:
+    q[a] = d[a]
+done
+where
+d[i] = 1 if element(i, adamantine)
+d[i] = 2
 
 ===

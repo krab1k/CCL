@@ -21,6 +21,9 @@ class CCLCodeError(CCLError):
             self.column = -1
         self.message: str = message
 
+    def __str__(self):
+        return self.message
+
 
 class CCLSyntaxError(CCLCodeError):
     pass

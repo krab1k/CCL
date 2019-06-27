@@ -373,7 +373,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 if isinstance(s, SubstitutionSymbol):
                     raise CCLSymbolError(node.lhs, f'Cannot assign to a substitution symbol {s.name}.')
                 if not isinstance(s.symbol_type(), ArrayType):
-                    raise CCLTypeError(node.lhs, f'Cannot assign to non Array type {s.symbol_type()}.')
+                    raise CCLTypeError(node.lhs, f'Cannot assign to non-Array type {s.symbol_type()}.')
                 index_types = []
                 for idx in node.lhs.indices:
                     self.visit(idx)
@@ -386,7 +386,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 node.lhs.name.result_type = s.symbol_type()
             else:
                 if not all(isinstance(i, ObjectType) for i in index_types):
-                    raise CCLTypeError(node.lhs, f'Cannot index with something different than Atom or Bond')
+                    raise CCLTypeError(node.lhs, f'Cannot index with something different than Atom or Bond.')
                 self.symbol_table.define(VariableSymbol(node.lhs.name.val, node, ArrayType(*index_types)))
                 node.lhs.name.result_type = ArrayType(*index_types)
             node.lhs.result_type = rtype
@@ -412,7 +412,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         if not check_args(f.type.args[0], node.arg.result_type):
             raise CCLTypeError(node.arg, f'Incompatible argument type for function {f.name}. '
-                                         f'Got {node.arg.result_type}, expected {f.type.args[0]}')
+                                         f'Got {node.arg.result_type}, expected {f.type.args[0]}.')
 
         node.result_type = f.type.return_type
 
@@ -432,26 +432,26 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 if ltype.indices == rtype.indices:
                     node.result_type = ltype
                 else:
-                    raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
+                    raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}.')
             elif node.op == ast.BinaryOp.Ops.MUL:
                 if ltype.dim() == rtype.dim() == 2:
                     if ltype.indices[1] != rtype.indices[0]:
-                        raise CCLTypeError(node, f'Cannot multiply matrices of types {ltype} and {rtype}')
+                        raise CCLTypeError(node, f'Cannot multiply matrices of types {ltype} and {rtype}.')
                     node.result_type = ArrayType(ltype.indices[0], rtype.indices[1])
                 elif ltype.dim() == 1 and rtype.dim() == 2:
                     if ltype.indices[0] != rtype.indices[0]:
-                        raise CCLTypeError(node, f'Cannot multiply vector of type {ltype} and matrix of type {rtype}')
+                        raise CCLTypeError(node, f'Cannot multiply vector of type {ltype} and matrix of type {rtype}.')
                     node.result_type = ArrayType(rtype.indices[1])
                 elif ltype.dim() == 2 and rtype.dim() == 1:
                     if ltype.indices[1] != rtype.indices[0]:
-                        raise CCLTypeError(node, f'Cannot multiply matrix of type {ltype} with vector of type {rtype}')
+                        raise CCLTypeError(node, f'Cannot multiply matrix of type {ltype} with vector of type {rtype}.')
                     node.result_type = ArrayType(ltype.indices[0])
                 elif ltype.dim() == rtype.dim() == 1:
                     if ltype != rtype:
-                        raise CCLTypeError(node, f'Cannot perform dot product of vectors of types {ltype} and {rtype}')
+                        raise CCLTypeError(node, f'Cannot perform dot product of vectors of types {ltype} and {rtype}.')
                     node.result_type = NumericType.FLOAT
             else:
-                raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
+                raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}.')
         #  One is Array, second Number
         elif isinstance(ltype, (ArrayType, NumericType)) and \
                 isinstance(rtype, (ArrayType, NumericType)):
@@ -459,13 +459,13 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 raise CCLTypeError(node, f'Cannot perform operation other than * or / between Number and Array.')
             if node.op == ast.BinaryOp.Ops.DIV and isinstance(ltype, NumericType) and \
                     isinstance(rtype, ArrayType):
-                raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
+                raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}.')
             if isinstance(ltype, ArrayType):
                 node.result_type = ltype
             else:
                 node.result_type = rtype
         else:
-            raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}')
+            raise CCLTypeError(node, f'Cannot perform {node.op.value} for types {ltype} and {rtype}.')
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> None:
         self.visit(node.expr)
@@ -474,7 +474,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
     def visit_For(self, node: ast.For) -> None:
         s = self.current_table.resolve(node.name.val)
         if s is not None:
-            raise CCLSymbolError(node.name, f'Symbol {node.name.val} already defined.')
+            raise CCLSymbolError(node.name, f'Loop variable {node.name.val} already defined.')
 
         self._iterating_over.add(node.name.val)
         table = SymbolTable(self.current_table)
@@ -492,7 +492,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
     def visit_ForEach(self, node: ast.ForEach) -> None:
         s = self.current_table.resolve(node.name.val)
         if s is not None:
-            raise CCLSymbolError(node.name, f'Symbol {node.name.val} already defined.')
+            raise CCLSymbolError(node.name, f'Loop variable {node.name.val} already defined.')
 
         table = SymbolTable(self.current_table)
 
@@ -601,7 +601,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         for used_name in used_names:
             symbol = self.global_table.resolve(used_name)
             if isinstance(symbol, SubstitutionSymbol):
-                raise CCLSymbolError(node, f'Cannot nest substitution {used_name} in another {name}')
+                raise CCLSymbolError(node, f'Cannot nest substitution {used_name} in another substitution {name}.')
 
     def visit_Predicate(self, node: ast.Predicate) -> None:
         try:
@@ -611,7 +611,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         if len(f.type.args) != len(node.args):
             raise CCLSymbolError(node, f'Predicate {f.name} should have {len(f.type.args)} arguments '
-                                       f'but got {len(node.args)}')
+                                       f'but got {len(node.args)} instead.')
 
         for arg_type, arg in zip(f.type.args, node.args):
             if isinstance(arg_type, ObjectType):
@@ -619,13 +619,13 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 assert isinstance(arg, ast.Name)
                 name = self._indices_mapping.get(arg.val, arg.val)
                 if name not in self.iterating_over:
-                    raise CCLSymbolError(arg, f'Symbol {arg.val} not bound to ForEach or Sum.')
+                    raise CCLSymbolError(arg, f'Object {arg.val} not bound to ForEach or Sum.')
                 if arg.result_type != arg_type:
-                    raise CCLTypeError(arg, f'Predicate\'s {node.name} argument is not {arg_type}')
+                    raise CCLTypeError(arg, f'Predicate\'s {node.name} argument is not {arg_type}.')
             elif isinstance(arg_type, StringType):
                 # Note that name would not have result_type set as it's really a String
                 if not isinstance(arg, ast.Name):
-                    raise CCLTypeError(arg, f'Predicate {node.name} expected string argument')
+                    raise CCLTypeError(arg, f'Predicate {node.name} expected string argument.')
             elif isinstance(arg_type, NumericType):
                 if not isinstance(arg.result_type, NumericType):
                     raise CCLTypeError(arg, f'Predicate {node.name} expected numeric argument.')
@@ -633,7 +633,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 raise Exception('We should not get here!')
 
         if f.name == 'element' and node.args[1].val.lower() not in ELEMENT_NAMES:
-            raise CCLTypeError(node.args[1], f'Unknown element {node.args[1].val}')
+            raise CCLTypeError(node.args[1], f'Unknown element {node.args[1].val}.')
 
 
 class NameGetter:
