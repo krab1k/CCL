@@ -286,7 +286,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
                     if results == {None}:
                         raise CCLSymbolError(node, f'Cannot index bond parameter by two non-bonded atoms.')
 
-            if symbol_type == ParameterType.COMMON:
+            if symbol_type == NumericType.FLOAT:
                 raise CCLTypeError(node, f'Cannot index common parameter.')
         elif isinstance(s, VariableSymbol) and isinstance(symbol_type, ArrayType):
             if symbol_type.indices != index_types:
