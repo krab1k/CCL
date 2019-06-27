@@ -2,7 +2,7 @@
 
 import itertools
 import html
-from typing import List, Dict
+from typing import List, Dict, Any
 from enum import Enum
 
 from ccl import ast, symboltable
@@ -36,7 +36,7 @@ class SymbolTableNode:
 
 
 class Graphviz(ast.ASTVisitor):
-    def __init__(self, table: symboltable.SymbolTable, **kwargs) -> None:
+    def __init__(self, table: symboltable.SymbolTable, **kwargs: Dict[str, Any]) -> None:
         super().__init__()
         self.nodes: List[GraphNode] = []
         self.symbol_table_nodes: List[SymbolTableNode] = []

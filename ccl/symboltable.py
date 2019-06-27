@@ -1,6 +1,6 @@
 """CCL's implementation of a symbol table"""
 
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Union, Tuple
 from abc import ABC, abstractmethod
 
 from ccl import ast
@@ -111,7 +111,7 @@ class SymbolTable:
     def __repr__(self) -> str:
         return 'SymbolTable'
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str) -> Symbol:
         return self.symbols[item]
 
     def resolve(self, s: str) -> Optional[Symbol]:
@@ -140,7 +140,7 @@ class SymbolTable:
         return visitor.symbol_table
 
     @classmethod
-    def get_table_for_node(cls, node: ast.ASTNode):
+    def get_table_for_node(cls, node: ast.ASTNode) -> 'SymbolTable':
         if hasattr(node, 'symbol_table'):
             return node.symbol_table
 
@@ -326,7 +326,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         node.result_type = NumericType.FLOAT
 
     def visit_Assign(self, node: ast.Assign) -> None:
-        def check_types(lhs: Type, rhs: Type):
+        def check_types(lhs: Type, rhs: Type) -> bool:
             if isinstance(lhs, ArrayType) and isinstance(rhs, ArrayType):
                 return lhs == rhs
             # Can assign number to all elements of the vector/matrix
@@ -397,7 +397,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
     def visit_Function(self, node: ast.Function) -> None:
         # Functions have only one numerical argument
-        def check_args(expected: Type, given: Type):
+        def check_args(expected: Type, given: Type) -> bool:
             if expected == given:
                 return True
             if given == NumericType.INT and expected == NumericType.FLOAT:

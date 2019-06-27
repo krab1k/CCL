@@ -1,6 +1,6 @@
 """Generate LaTeX representation of a method written in CCL"""
 
-from typing import Union
+from typing import Dict, Union, Any
 
 from ccl import ast, symboltable
 
@@ -32,7 +32,7 @@ def get_name(name: str) -> str:
 
 # noinspection PyPep8Naming
 class Latex(ast.ASTVisitor):
-    def __init__(self, symbol_table: symboltable.SymbolTable, **kwargs) -> None:
+    def __init__(self, symbol_table: symboltable.SymbolTable, **kwargs: Dict[str, Any]) -> None:
         super().__init__()
         self.depth: int = 0
         self.symbol_table: symboltable.SymbolTable = symbol_table
@@ -177,14 +177,14 @@ class Latex(ast.ASTVisitor):
         functions = []
         for symbol in self.symbol_table.symbols.values():
             if isinstance(symbol, symboltable.ParameterSymbol):
-                if symbol.type == ast.ParameterType.ATOM:
+                if symbol.symbol_type == ast.ParameterType.ATOM:
                     atom_parameters.append(symbol)
-                elif symbol.type == ast.ParameterType.BOND:
+                elif symbol.symbol_type == ast.ParameterType.BOND:
                     bond_parameters.append(symbol)
                 else:
                     common_parameters.append(symbol)
             elif isinstance(symbol, symboltable.ObjectSymbol):
-                if symbol.type == ast.ObjectType.ATOM:
+                if symbol.symbol_type == ast.ObjectType.ATOM:
                     atoms.append(symbol)
                 else:
                     bonds.append(symbol)

@@ -1,7 +1,7 @@
 """CCL's translator module"""
 
 import importlib
-from typing import Optional
+from typing import Optional, Dict, Any
 import antlr4
 
 import ccl.antlr.CCL_Lexer as CCL_Lexer
@@ -11,7 +11,7 @@ from ccl.symboltable import SymbolTable
 from ccl.parser import Parser, CCLErrorListener
 
 
-def translate(source: str, output_language: Optional[str] = None, **kwargs) -> Optional[str]:
+def translate(source: str, output_language: Optional[str] = None, **kwargs: Dict[str, Any]) -> Optional[str]:
     """Translate CCL into the given output language"""
 
     lexer = CCL_Lexer.CCL_Lexer(antlr4.InputStream(source))

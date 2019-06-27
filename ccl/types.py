@@ -12,13 +12,13 @@ class Type:
 
 class StringType(Type):
     """String type"""
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'String'
 
 
 class BoolType(Type):
     """Boolean type"""
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'Bool'
 
 
@@ -53,7 +53,7 @@ class ArrayType(Type):
         args_str = ', '.join(str(arg) for arg in self.indices)
         return f'Float[{args_str}]'
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, ArrayType):
             return False
         return self.indices == other.indices
@@ -76,7 +76,7 @@ class FunctionType(Type):
         args_str = ' x '.join(f'{arg}' for arg in self.args)
         return f'{args_str} -> {self.return_type}'
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, FunctionType):
             return False
         return self.args == other.args and self.return_type == other.return_type
@@ -87,5 +87,5 @@ class PredicateType(FunctionType):
     def __init__(self, *args: Union[ObjectType, NumericType, StringType]):
         super().__init__(BoolType(), *args)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'PredicateType{self.args} -> Bool'

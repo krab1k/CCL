@@ -1,9 +1,10 @@
 """CCL's abstract syntax tree elements"""
 
 from enum import Enum
-from typing import List, Optional, Generator, Any
+from typing import List, Optional, Generator, Any, Tuple, Union
 
 from ccl.types import *
+from ccl.common import NoValEnum
 
 
 class ASTNode:
@@ -145,13 +146,13 @@ class Number(Expression):
     def __repr__(self) -> str:
         return f'Number({self.val})'
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, Number):
             return self.val == other.val and self.result_type == other.result_type
         else:
             return False
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.val) ^ hash(self.result_type)
 
 
@@ -163,13 +164,13 @@ class Name(Expression):
     def __repr__(self) -> str:
         return f'Name({self.val})'
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, Name):
             return self.val == other.val
         else:
             return False
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.val)
 
 
@@ -282,13 +283,13 @@ class BinaryLogicalOp(Constraint):
         self.rhs: Constraint = rhs
         self.op: BinaryLogicalOp.Ops = op
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, RelOp):
             return self.lhs == other.lhs and self.rhs == self.rhs and self.op == other.op
         else:
             return False
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.lhs) ^ hash(self.rhs) ^ hash(self.op)
 
 
@@ -301,13 +302,13 @@ class UnaryLogicalOp(Constraint):
         self.op: UnaryLogicalOp.Ops = op
         self.constraint: Constraint = constraint
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, UnaryLogicalOp):
             return self.op == other.op and self.constraint == other.constraint
         else:
             return False
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.op) ^ hash(self.constraint)
 
 
@@ -326,13 +327,13 @@ class RelOp(Constraint):
         self.rhs: Expression = rhs
         self.op: RelOp.Ops = op
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, RelOp):
             return self.lhs == other.lhs and self.rhs == self.rhs and self.op == other.op
         else:
             return False
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.lhs) ^ hash(self.rhs) ^ hash(self.op)
 
 
@@ -342,13 +343,13 @@ class Predicate(Constraint):
         self.name: str = name
         self.args: Tuple[Union[Number, Name], ...] = args
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, Predicate):
             return self.name == other.name and self.args == other.args
         else:
             return False
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name) ^ hash(self.args)
 
 
@@ -369,7 +370,7 @@ class Substitution(Annotation):
 
 
 class Object(Annotation):
-    def __init__(self, pos: Tuple[int, int], name: str, otype: ObjectType, atom_indices: Union[None, Tuple[str, str]],
+    def __init__(self, pos: Tuple[int, int], name: str, otype: ObjectType, atom_indices: Optional[Tuple[str, str]],
                  constraints: Optional[Constraint]) -> None:
         super().__init__(pos)
         self.name: str = name
