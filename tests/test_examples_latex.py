@@ -6,7 +6,7 @@ import shutil
 import os
 import subprocess
 
-from ccl import translate
+from ccl.translate import translate
 from ccl.errors import CCLCodeError
 
 
@@ -16,9 +16,10 @@ def test_examples_latex(method):
     with open(f'examples/{method}') as f:
         data = f.read()
     try:
-        latex = translate(data, 'latex', full_output=True)
+        code = translate(data, 'latex', full_output=True)
+        assert code is not None
         with open(os.path.join(tmpdir, 'method.tex'), 'w') as f:
-            f.write(latex)
+            f.write(code)
     except CCLCodeError as e:
         shutil.rmtree(tmpdir)
         line = data.split('\n')[e.line - 1]

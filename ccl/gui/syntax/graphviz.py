@@ -4,7 +4,7 @@ from PyQt5.QtGui import QTextDocument, QTextCharFormat
 from PyQt5.QtCore import QRegExp
 from typing import List, Tuple
 
-from .common import STYLES, SyntaxHighlighter
+from ccl.gui.syntax.common import STYLES, SyntaxHighlighter
 
 
 class GraphvizHighlighter(SyntaxHighlighter):

@@ -1,7 +1,7 @@
 import sys
 
 from ccl.errors import CCLError, CCLCodeError
-from ccl import translate
+from ccl.translate import translate
 
 if len(sys.argv) != 2:
     print('Not enough arguments')

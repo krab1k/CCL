@@ -1,6 +1,6 @@
 """CCL's implementation of a symbol table"""
 
-from typing import Dict, Optional, Set, Union, Tuple
+from typing import Dict, Optional, Set, Union, Tuple, Sequence, cast
 from abc import ABC, abstractmethod
 
 from ccl import ast
@@ -18,8 +18,9 @@ class Symbol(ABC):
         self.name: str = name
         self.def_node: Optional[ast.ASTNode] = def_node
 
+    @property
     @abstractmethod
-    def symbol_type(self) -> Union[NumericType, ArrayType, ObjectType, ArrayType, ParameterType, FunctionType]:
+    def symbol_type(self) -> Union[NumericType, ArrayType, ObjectType, ParameterType, FunctionType]:
         pass
 
 
@@ -31,6 +32,7 @@ class ParameterSymbol(Symbol):
     def __repr__(self) -> str:
         return f'ParameterSymbol({self.name}, {self.type})'
 
+    @property
     def symbol_type(self) -> ParameterType:
         return self.type
 
@@ -45,6 +47,7 @@ class ObjectSymbol(Symbol):
     def __repr__(self) -> str:
         return f'ObjectSymbol({self.name}, {self.type}, {self.constraints})'
 
+    @property
     def symbol_type(self) -> ObjectType:
         return self.type
 
@@ -57,6 +60,7 @@ class FunctionSymbol(Symbol):
     def __repr__(self) -> str:
         return f'FunctionSymbol({self.name}, {self.function})'
 
+    @property
     def symbol_type(self) -> FunctionType:
         return self.function.type
 
@@ -70,6 +74,7 @@ class VariableSymbol(Symbol):
     def __repr__(self) -> str:
         return f'VariableSymbol({self.name}, {self.type})'
 
+    @property
     def symbol_type(self) -> Union[NumericType, ArrayType]:
         return self.type
 
@@ -83,9 +88,12 @@ class SubstitutionSymbol(Symbol):
     def __repr__(self) -> str:
         return f'SubstitutionSymbol({self.name}, {self.indices})'
 
-    def symbol_type(self) -> Union[NumericType, ArrayType, ObjectType, ArrayType, ParameterType]:
+    @property
+    def symbol_type(self) -> Union[NumericType, ArrayType, ObjectType, ParameterType]:
         # All the expressions must have same type, so pick the default one
-        return self.rules[None].result_type
+        rt = self.rules[None].result_type
+        assert rt is not None and not isinstance(rt, FunctionType)
+        return rt
 
 
 class ConstantSymbol(Symbol):
@@ -97,7 +105,9 @@ class ConstantSymbol(Symbol):
     def __repr__(self) -> str:
         return f'ConstantSymbol({self.name}, {self.property}, {self.element})'
 
+    @property
     def symbol_type(self) -> NumericType:
+        assert isinstance(self.property.type.return_type, NumericType)
         return self.property.type.return_type
 
 
@@ -233,10 +243,10 @@ class SymbolTableBuilder(ast.ASTVisitor):
         if s is not None:
             if isinstance(s, SubstitutionSymbol):
                 self.visit(s.rules[None])
-            if s.symbol_type() == ParameterType.COMMON:
+            if s.symbol_type == ParameterType.COMMON:
                 node.result_type = NumericType.FLOAT
             else:
-                node.result_type = s.symbol_type()
+                node.result_type = s.symbol_type
 
         else:
             raise CCLSymbolError(node, f'Symbol {name} not defined.')
@@ -248,15 +258,15 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
         symbol_type = node.name.result_type
 
-        index_types = []
+        index_types_list = []
         for idx in node.indices:
             self.visit(idx)
-            index_types.append(idx.result_type)
+            index_types_list.append(idx.result_type)
             mapped_val = self._indices_mapping.get(idx.val, idx.val)
             if isinstance(idx.result_type, ObjectType) and \
                     mapped_val not in self.iterating_over:
                 raise CCLSymbolError(idx, f'Object {mapped_val} not bound to any For/ForEach/Sum.')
-        index_types = tuple(index_types)
+        index_types = tuple(index_types_list)
         index_types_str = ', '.join(str(i) for i in index_types)
 
         if isinstance(s, ParameterSymbol):
@@ -268,13 +278,15 @@ class SymbolTableBuilder(ast.ASTVisitor):
 
                 # Check whether two atoms are actually bonded, i.e., 'bonded' predicate exists
                 if index_types == (ObjectType.ATOM, ObjectType.ATOM):
-                    c1 = self.current_table.resolve(node.indices[0].val).constraints
-                    c2 = self.current_table.resolve(node.indices[1].val).constraints
+                    s1 = self.current_table.resolve(node.indices[0].val)
+                    s2 = self.current_table.resolve(node.indices[1].val)
+                    assert s1 is not None and isinstance(s1, ObjectSymbol)
+                    assert s2 is not None and isinstance(s2, ObjectSymbol)
 
                     idx1 = node.indices[0].val
                     idx2 = node.indices[1].val
                     results: Set[Optional[ast.ASTNode]] = {None}
-                    for c in (c for c in (c1, c2) if c is not None):
+                    for c in (c for c in (s1.constraints, s2.constraints) if c is not None):
                         # Search for either bonded(i, j) or bonded(j, i)
                         results.add(ast.search_ast_element(c, ast.Predicate((-1, -1), 'bonded',
                                                                             (ast.Name((-1, -1), idx1),
@@ -293,10 +305,12 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 raise CCLTypeError(node, f'Cannot index Array of type {symbol_type} '
                                          f'using index/indices of type(s) {index_types_str}.')
         elif isinstance(s, FunctionSymbol):
+            assert isinstance(symbol_type, FunctionType)
             if symbol_type.args != index_types:
                 raise CCLTypeError(node, f'Cannot use function {s.function.name}: {s.function.type} '
                                          f'with arguments of type(s) {index_types_str}')
 
+            assert isinstance(s.function.type.return_type, (NumericType, ArrayType))
             node.result_type = s.function.type.return_type
             return
         elif isinstance(s, SubstitutionSymbol):
@@ -326,7 +340,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         node.result_type = NumericType.FLOAT
 
     def visit_Assign(self, node: ast.Assign) -> None:
-        def check_types(lhs: Type, rhs: Type) -> bool:
+        def check_types(lhs: CCLType, rhs: CCLType) -> bool:
             if isinstance(lhs, ArrayType) and isinstance(rhs, ArrayType):
                 return lhs == rhs
             # Can assign number to all elements of the vector/matrix
@@ -353,11 +367,12 @@ class SymbolTableBuilder(ast.ASTVisitor):
                     raise CCLSymbolError(node.lhs, f'Cannot assign to a substitution symbol {s.name}.')
                 if isinstance(s, ParameterSymbol):
                     raise CCLSymbolError(node.lhs, f'Cannot assign to a parameter symbol {s.name}.')
-                if check_types(s.symbol_type(), rtype):
-                    node.lhs.result_type = s.symbol_type()
+                symbol_type = s.symbol_type
+                if check_types(symbol_type, rtype):
+                    node.lhs.result_type = symbol_type
                 else:
                     raise CCLTypeError(node,
-                                       f'Cannot assign {rtype} to the variable {s.name} of type {s.symbol_type()}.')
+                                       f'Cannot assign {rtype} to the variable {s.name} of type {symbol_type}.')
             else:
                 # New symbols are defined at method scope
                 self.symbol_table.define(VariableSymbol(node.lhs.val, node, rtype))
@@ -371,33 +386,38 @@ class SymbolTableBuilder(ast.ASTVisitor):
                 if idx.val not in self._iterating_over:
                     raise CCLSymbolError(idx, f'Object {idx.val} not bound to any For/ForEach/Sum.')
             if s is not None:
+                symbol_type = s.symbol_type
                 # Check whether indices are correct
                 if isinstance(s, SubstitutionSymbol):
                     raise CCLSymbolError(node.lhs, f'Cannot assign to a substitution symbol {s.name}.')
-                if not isinstance(s.symbol_type(), ArrayType):
-                    raise CCLTypeError(node.lhs, f'Cannot assign to non-Array type {s.symbol_type()}.')
+                if not isinstance(symbol_type, ArrayType):
+                    raise CCLTypeError(node.lhs, f'Cannot assign to non-Array type {symbol_type}.')
                 index_types = []
                 for idx in node.lhs.indices:
                     self.visit(idx)
                     index_types.append(idx.result_type)
-                if s.symbol_type().indices != tuple(index_types):
+                if symbol_type.indices != tuple(index_types):
                     indices_str = ', '.join(str(i) for i in index_types)
-                    raise CCLTypeError(node.lhs, f'Cannot index Array of type {s.symbol_type()} '
+                    raise CCLTypeError(node.lhs, f'Cannot index Array of type {symbol_type} '
                                                  f'using index/indices of type(s) {indices_str}.')
 
-                node.lhs.name.result_type = s.symbol_type()
+                node.lhs.name.result_type = s.symbol_type
             else:
                 if not all(isinstance(i, ObjectType) for i in index_types):
                     raise CCLTypeError(node.lhs, f'Cannot index with something different than Atom or Bond.')
-                self.symbol_table.define(VariableSymbol(node.lhs.name.val, node, ArrayType(*index_types)))
-                node.lhs.name.result_type = ArrayType(*index_types)
+
+                # Hack for Mypy as it does not recognize the previous check
+                it = cast(Sequence[ObjectType], index_types)
+                self.symbol_table.define(VariableSymbol(node.lhs.name.val, node, ArrayType(*it)))
+                node.lhs.name.result_type = ArrayType(*it)
             node.lhs.result_type = rtype
         else:
             raise Exception('Should not get here!')
 
     def visit_Function(self, node: ast.Function) -> None:
         # Functions have only one numerical argument
-        def check_args(expected: Type, given: Type) -> bool:
+        def check_args(expected: Union[ObjectType, NumericType, ArrayType],
+                       given: Union[ObjectType, NumericType, ArrayType]) -> bool:
             if expected == given:
                 return True
             if given == NumericType.INT and expected == NumericType.FLOAT:
@@ -412,10 +432,14 @@ class SymbolTableBuilder(ast.ASTVisitor):
         except KeyError:
             raise CCLSymbolError(node, f'Function {node.name} is not known.')
 
+        assert isinstance(node.arg.result_type, (ObjectType, NumericType, ArrayType))
+        assert isinstance(f.type.args[0], (ObjectType, NumericType, ArrayType))
+
         if not check_args(f.type.args[0], node.arg.result_type):
             raise CCLTypeError(node.arg, f'Incompatible argument type for function {f.name}. '
                                          f'Got {node.arg.result_type}, expected {f.type.args[0]}.')
 
+        assert isinstance(f.type.return_type, (NumericType, ArrayType))
         node.result_type = f.type.return_type
 
     def visit_BinaryOp(self, node: ast.BinaryOp) -> None:
@@ -532,10 +556,10 @@ class SymbolTableBuilder(ast.ASTVisitor):
         if s is None:
             raise CCLSymbolError(node.name, f'Symbol {node.name.val} not defined.')
 
-        node.name.result_type = s.symbol_type()
+        node.name.result_type = s.symbol_type
 
         if not isinstance(s, ObjectSymbol):
-            raise CCLSymbolError(node.name, f'Sum has to iterate over Atom or Bond not {s.symbol_type()}.')
+            raise CCLSymbolError(node.name, f'Sum has to iterate over Atom or Bond not {s.symbol_type}.')
 
         self._iterating_over.add(node.name.val)
         if s.constraints is not None:
@@ -624,7 +648,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
                     raise CCLSymbolError(arg, f'Object {arg.val} not bound to ForEach or Sum.')
                 if arg.result_type != arg_type:
                     raise CCLTypeError(arg, f'Predicate\'s {node.name} argument is not {arg_type}.')
-            elif isinstance(arg_type, StringType):
+            elif arg_type == StringType:
                 # Note that name would not have result_type set as it's really a String
                 if not isinstance(arg, ast.Name):
                     raise CCLTypeError(arg, f'Predicate {node.name} expected string argument.')
@@ -634,7 +658,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
             else:
                 raise Exception('We should not get here!')
 
-        if f.name == 'element' and node.args[1].val.lower() not in ELEMENT_NAMES:
+        if f.name == 'element' and str(node.args[1].val).lower() not in ELEMENT_NAMES:
             raise CCLTypeError(node.args[1], f'Unknown element {node.args[1].val}.')
 
 
@@ -655,7 +679,7 @@ class NameGetter:
                     names |= cls.visit(expr, table)
                 names -= {idx.val for idx in symbol.indices}
         for _, value in node:
-            if isinstance(value, list):
+            if isinstance(value, (list, tuple)):
                 for item in value:
                     if isinstance(item, ast.ASTNode):
                         names = names | cls.visit(item, table)

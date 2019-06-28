@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import Set, Dict, Union, List, Optional
+from typing import Set, Dict, Union, List, Optional, cast
 
 from ccl import ast, symboltable
 from ccl.types import *
@@ -110,8 +110,8 @@ class Cpp(ast.ASTVisitor):
     def __init__(self, symbol_table: symboltable.SymbolTable, **kwargs: Union[str, bool]) -> None:
         self.symbol_table: symboltable.SymbolTable = symbol_table
 
-        self.output_dir: Optional[str] = kwargs.get('output_dir', None)
-        self.format_code: bool = kwargs.get('format_code', True)
+        self.output_dir: Optional[str] = cast(str, kwargs.get('output_dir', None))
+        self.format_code: bool = cast(bool, kwargs.get('format_code', True))
 
         self.sys_includes: Set[str] = set()
         self.user_includes: Set[str] = set()
@@ -283,13 +283,15 @@ class Cpp(ast.ASTVisitor):
         symbol = table.resolve(name)
         assert symbol is not None
         if symbol.name not in self.var_definitions:
-            if symbol.symbol_type == NumericType.INT:
+            symbol_type = symbol.symbol_type
+            if symbol_type == NumericType.INT:
                 definition = f'int _{symbol.name} = 0;'
-            elif symbol.symbol_type == NumericType.FLOAT:
+            elif symbol_type == NumericType.FLOAT:
                 definition = f'double _{symbol.name} = 0.0;'
             else:  # ArrayType
-                sizes = ', '.join('n' if t == ObjectType.ATOM else 'm' for t in symbol.symbol_type.indices)
-                if len(symbol.symbol_type.indices) == 1:
+                assert isinstance(symbol_type, ArrayType)
+                sizes = ', '.join('n' if t == ObjectType.ATOM else 'm' for t in symbol_type.indices)
+                if len(symbol_type.indices) == 1:
                     var_type = 'VectorXd'
                 else:
                     var_type = 'MatrixXd'
@@ -464,6 +466,7 @@ class Cpp(ast.ASTVisitor):
             if s is None:
                 local_symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(name)
                 assert local_symbol is not None
+                assert isinstance(local_symbol.symbol_type, (ArrayType, NumericType, ObjectType))
                 if isinstance(local_symbol.symbol_type, ArrayType):
                     type_str = 'const Eigen::MatrixXd &'
                 else:
@@ -499,7 +502,7 @@ class Cpp(ast.ASTVisitor):
 
     def visit_Predicate(self, node: ast.Predicate) -> str:
         if node.name == 'element':
-            return f'_{node.args[0].val}.element().name() == "{node.args[1].val.capitalize()}"'
+            return f'_{node.args[0].val}.element().name() == "{str(node.args[1].val).capitalize()}"'
         elif node.name == 'near':
             return f'distance(_{node.args[0].val}, _{node.args[1].val}) < {node.args[2].val}'
         elif node.name == 'bonded':

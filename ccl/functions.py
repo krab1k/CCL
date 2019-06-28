@@ -46,7 +46,7 @@ FUNCTIONS['bond order'] = Function('bond order', FunctionType(NumericType.INT, O
 # Add custom functions
 FUNCTIONS['distance'] = Function('distance', FunctionType(NumericType.FLOAT, ObjectType.ATOM, ObjectType.ATOM))
 
-PREDICATES = {'element': Function('element', PredicateType(ObjectType.ATOM, StringType())),
+PREDICATES = {'element': Function('element', PredicateType(ObjectType.ATOM, StringType)),
               'bonded': Function('bonded', PredicateType(ObjectType.ATOM, ObjectType.ATOM)),
               'near': Function('near', PredicateType(ObjectType.ATOM, ObjectType.ATOM, NumericType.FLOAT)),
               'bond_distance': Function('bond_distance',

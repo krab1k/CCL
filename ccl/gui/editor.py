@@ -7,9 +7,10 @@ from PyQt5.QtWidgets import QApplication, QWidget, QPlainTextEdit, QVBoxLayout, 
 from PyQt5.QtGui import QFont, QTextCursor, QTextBlockFormat, QColor
 
 import ccl.generators
-from ccl import translate
+from ccl.translate import translate
 from ccl.errors import CCLCodeError
-from ccl.gui.syntax import SyntaxHighlighter, CCLHighlighter
+from ccl.gui.syntax.common import SyntaxHighlighter
+from ccl.gui.syntax.ccl import CCLHighlighter
 
 
 class Editor(QWidget):
@@ -56,6 +57,7 @@ class Editor(QWidget):
         if data:
             try:
                 code = translate(data, self.language)
+                assert code is not None
                 self.code.setPlainText(code)
                 self.status.setText('OK')
 
@@ -86,7 +88,7 @@ class Editor(QWidget):
     def initUI(self) -> None:
         quit_action = QAction(self)
         quit_action.setShortcut('Ctrl+Q')
-        quit_action.triggered.connect(self.close)
+        quit_action.triggered.connect(self.close)  # type: ignore
         self.addAction(quit_action)
 
         font = QFont()
@@ -97,7 +99,7 @@ class Editor(QWidget):
         self.code.setFont(font)
         self.code.setReadOnly(True)
 
-        self.editor.textChanged.connect(self.ccl_changed)
+        self.editor.textChanged.connect(self.ccl_changed)  # type: ignore
 
         layout = QVBoxLayout(self)
         self.language_box.addItems(ccl.generators.BACKENDS)

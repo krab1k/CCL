@@ -5,7 +5,7 @@ import tempfile
 import subprocess
 import shutil
 
-from ccl import translate
+from ccl.translate import translate
 from ccl.errors import CCLCodeError
 
 

@@ -289,7 +289,7 @@ class BinaryLogicalOp(Constraint):
         self.op: BinaryLogicalOp.Ops = op
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, RelOp):
+        if isinstance(other, BinaryLogicalOp):
             return self.lhs == other.lhs and self.rhs == self.rhs and self.op == other.op
         else:
             return False

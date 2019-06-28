@@ -1,47 +1,47 @@
 """Types used in CCL"""
 
-from typing import Union, Tuple
+from typing import Union, Tuple, Type
 
 from ccl.common import NoValEnum
 
 
-class Type:
+class CCLType:
     """Baseclass type"""
     pass
 
 
-class StringType(Type):
+class StringType(CCLType):
     """String type"""
     def __repr__(self) -> str:
         return 'String'
 
 
-class BoolType(Type):
+class BoolType(CCLType):
     """Boolean type"""
     def __repr__(self) -> str:
         return 'Bool'
 
 
-class ObjectType(Type, NoValEnum):
+class ObjectType(CCLType, NoValEnum):
     """Type for atom or bond"""
     ATOM = 'Atom'
     BOND = 'Bond'
 
 
-class NumericType(Type, NoValEnum):
+class NumericType(CCLType, NoValEnum):
     """Integer or floating point type"""
     INT = 'Int'
     FLOAT = 'Float'
 
 
-class ParameterType(Type, NoValEnum):
+class ParameterType(CCLType, NoValEnum):
     """Type for parameters"""
     ATOM = 'Atom Parameter'
     BOND = 'Bond Parameter'
     COMMON = 'Common Parameter'
 
 
-class ArrayType(Type):
+class ArrayType(CCLType):
     """Type representing an array"""
     def __init__(self, *indices: ObjectType) -> None:
         self.indices: Tuple[ObjectType, ...] = indices
@@ -62,12 +62,12 @@ class ArrayType(Type):
         return len(self.indices)
 
 
-class FunctionType(Type):
+class FunctionType(CCLType):
     """Function type"""
-    def __init__(self, return_type: Union[BoolType, NumericType, ArrayType],
-                 *args: Union[ObjectType, NumericType, ArrayType, StringType]) -> None:
-        self.args: Tuple[Union[ObjectType, NumericType, ArrayType, StringType], ...] = args
-        self.return_type: Union[BoolType, NumericType, ArrayType] = return_type
+    def __init__(self, return_type: Union[Type[BoolType], NumericType, ArrayType],
+                 *args: Union[ObjectType, NumericType, ArrayType, Type[StringType]]) -> None:
+        self.args: Tuple[Union[ObjectType, NumericType, ArrayType, Type[StringType]], ...] = args
+        self.return_type: Union[Type[BoolType], NumericType, ArrayType] = return_type
 
     def __repr__(self) -> str:
         return f'FunctionType{self.args} -> {self.return_type}'
@@ -84,8 +84,8 @@ class FunctionType(Type):
 
 class PredicateType(FunctionType):
     """Functions returing boolean"""
-    def __init__(self, *args: Union[ObjectType, NumericType, StringType]):
-        super().__init__(BoolType(), *args)
+    def __init__(self, *args: Union[ObjectType, NumericType, Type[StringType]]):
+        super().__init__(BoolType, *args)
 
     def __repr__(self) -> str:
         return f'PredicateType{self.args} -> Bool'

@@ -3,7 +3,7 @@
 import pytest
 import re
 
-from ccl import translate
+from ccl.translate import translate
 from ccl.errors import CCLCodeError
 
 

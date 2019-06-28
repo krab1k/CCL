@@ -9,10 +9,10 @@ from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter
 def _format(color: Union[List[int], str], style: str = '') -> QTextCharFormat:
     """Return a QTextCharFormat with the given attributes."""
     _color = QColor()
-    if type(color) is not str:
-        _color.setRgb(color[0], color[1], color[2])
-    else:
+    if isinstance(color, str):
         _color.setNamedColor(color)
+    else:
+        _color.setRgb(color[0], color[1], color[2])
 
     f = QTextCharFormat()
     f.setForeground(_color)
