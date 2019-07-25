@@ -17,7 +17,7 @@ print(data)
 
 print('\n*** Translated ****\n')
 try:
-    print(translate(data, 'cpp', output_dir='/tmp/output'))
+    print(translate(data, 'latex', full_output=True))
 except CCLCodeError as e:
     print('\nERROR: ' + str(e.message))
     print(f'\n{e.line:2d}:', data.split('\n')[e.line - 1])
