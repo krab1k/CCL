@@ -1,7 +1,11 @@
 """Generate LaTeX representation of a method written in CCL"""
 
 
+from typing import List, DefaultDict
+from collections import defaultdict
+
 from ccl import ast, symboltable
+from ccl.functions import MATH_FUNCTIONS
 
 
 GREEK_LETTERS = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu',
@@ -13,13 +17,68 @@ __all__ = ['Latex']
 
 latex_template = '''\
 \\documentclass{{article}}
+\\usepackage{{algorithmicx}}
+\\usepackage{{etoolbox}}
 \\usepackage{{amsmath}}
 \\usepackage{{amssymb}}
+
+\\algblockdefx[ForEach]{{ForEach}}{{EndForEach}}%
+    [3]{{\\textbf{{for $\\forall$ #1}} $#2$\\notblank{{#3}}{{\\textbf{{ such that}} #3}}{{}}:}}%
+    {{}}
+    
+\\algblockdefx[For]{{For}}{{EndFor}}%
+    [3]{{\\textbf{{for $#1 = #2$ to $#3$}}:}}%
+    {{}}
 \\pagestyle{{empty}}
 \\begin{{document}}
-{code}
+\\begin{{algorithmic}}
+{method}
+\\end{{algorithmic}}
+where
+{substitutions}
+{annotations}
 \\end{{document}}
 '''
+
+for_template = '''\
+\\For{{{name}}}{{{value_from}}}{{{value_to}}}
+{code}
+\\EndFor\
+'''
+
+foreach_template = '''\
+\\ForEach{{{type}}}{{{name}}}{{{constraints}}}
+{code}
+\\EndForEach\
+'''
+
+substitutions_template = '''\
+\\begin{{eqnarray*}}
+{substitutions}
+\\end{{eqnarray*}}\
+'''
+
+cases_template = '''\
+{lhs} &=& 
+\\begin{{cases}}
+{cases}
+\\end{{cases}}\
+'''
+
+
+def add_article(word: str) -> str:
+    if word[0] in 'aeio':
+        return f'an {word}'
+    else:
+        return f'a {word}'
+
+
+def make_parameter_sentence(p_type: str, symbols: List[symboltable.ParameterSymbol]) -> str:
+    if len(symbols) == 1:
+        return f'${symbols[0].name}$ is {add_article(p_type)} parameter'
+    else:
+        names = ', '.join(f'${s.name}$' for s in symbols[:-1])
+        return names + f' and ${symbols[-1].name}$ are {p_type} parameters'
 
 
 class Latex(ast.ASTVisitor):
@@ -27,34 +86,98 @@ class Latex(ast.ASTVisitor):
         self.symbol_table: symboltable.SymbolTable = table
         self.full_output: bool = kwargs.get('full_output', False)
 
-    def visit_Method(self, node: ast.Method) -> str:
-        method = ''
-        for statement in node.statements:
-            method += self.visit(statement)
+        self._substitutions: List[symboltable.SubstitutionSymbol] = []
 
-        annotations = 'where $q$ is a vector of atomic charges.'
+    def process_symbols(self) -> List[str]:
+        sentences = []
+        parameters: DefaultDict[str, List[symboltable.ParameterSymbol]] = defaultdict(list)
+        constants = []
+        functions = []
+        objects = []
+
+        assert self.symbol_table.parent is not None
+        for s in self.symbol_table.parent.symbols.values():
+            if isinstance(s, symboltable.ParameterSymbol):
+                if s.symbol_type == ast.ParameterType.ATOM:
+                    parameters['atom'].append(s)
+                elif s.symbol_type == ast.ParameterType.BOND:
+                    parameters['bond'].append(s)
+                else:
+                    parameters['common'].append(s)
+            elif isinstance(s, symboltable.ConstantSymbol):
+                constants.append(s)
+            elif isinstance(s, symboltable.FunctionSymbol):
+                functions.append(s)
+            elif isinstance(s, symboltable.ObjectSymbol):
+                objects.append(s)
+            elif isinstance(s, symboltable.SubstitutionSymbol):
+                self._substitutions.append(s)
+
+        for p_type in ['atom', 'bond', 'common']:
+            if parameters[p_type]:
+                sentences.append(make_parameter_sentence(p_type, parameters[p_type]))
+
+        sentences.extend(f'${s.name}$ is the {s.property.name} of {s.element}' for s in constants)
+        sentences.extend(f'${s.name}$ is {s.function.name}' for s in functions if s.name not in MATH_FUNCTIONS)
+
+        for s in objects:
+            constraints = ' such that ' + self.visit(s.constraints) if s.constraints else ''
+            sentences.append(f'${s.name}$ is {add_article(s.type.value.lower())}{constraints}')
+
+        return sentences
+
+    def process_substitutions(self) -> str:
+        if not self._substitutions:
+            return ''
+
+        substitutions = []
+        for s in self._substitutions:
+            if s.indices:
+                lhs = f'{s.name}_{{{", ".join(self.visit(idx) for idx in s.indices)}}}'
+            else:
+                lhs = f'{s.name}'
+            if len(s.rules) == 1:
+                substitutions.append(f'{lhs} &=& {self.visit(s.rules[None])}\\\\')
+            else:
+                rules = []
+                for constraint, expr in s.rules.items():
+                    if constraint is None:
+                        continue
+                    rules.append(f'{self.visit(expr)} & \\text{{if {self.visit(constraint)}}},\\\\')
+                rules.append(f'{self.visit(s.rules[None])} & \\text{{otherwise.}}')
+                substitutions.append(cases_template.format(lhs=lhs, cases='\n'.join(rules)))
+
+        return substitutions_template.format(substitutions='\n'.join(substitutions))
+
+    def visit_Method(self, node: ast.Method) -> str:
+        method = '\n'.join(self.visit(statement) for statement in node.statements)
+
+        annotations = ['$q$ is a vector of atomic charges']
+        annotations.extend(self.process_symbols())
+
+        substitutions = self.process_substitutions()
+        if substitutions != '':
+            annotations[0] = f'and {annotations[0]}'
+
+        annotations_str = ', '.join(annotations) + '.'
 
         if self.full_output:
-            return latex_template.format(code=method + '\\\\\n' + annotations)
+            return latex_template.format(method=method, substitutions=substitutions, annotations=annotations_str)
         else:
-            return method + annotations
+            return method + substitutions + annotations_str
 
     def visit_Assign(self, node: ast.Assign) -> str:
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
 
-        return f'$${lhs} = {rhs}$$\\\\'
+        return f'\\State $\\displaystyle {lhs} = {rhs}$'
 
     def visit_For(self, node: ast.For) -> str:
         name = self.visit(node.name)
         value_from = self.visit(node.value_from)
         value_to = self.visit(node.value_to)
-        header = f'for ${value_from} \\leq {name} \\leq {value_to}$:\\\\\n'
-        statements = []
-        for statement in node.body:
-            statements.append(self.visit(statement))
-
-        return header + '\n'.join(statements)
+        statements = [self.visit(s) for s in node.body]
+        return for_template.format(name=name, value_from=value_from, value_to=value_to, code='\n'.join(statements))
 
     def visit_ForEach(self, node: ast.ForEach) -> str:
         name = self.visit(node.name)
@@ -62,12 +185,10 @@ class Latex(ast.ASTVisitor):
             ab_type = 'atom'
         else:
             ab_type = 'bond'
-        header = f'$\\forall$ {ab_type} ${name}$:\\\\\n'
-        statements = []
-        for statement in node.body:
-            statements.append(self.visit(statement))
 
-        return header + '\n'.join(statements)
+        constraints = self.visit(node.constraints) if node.constraints else ''
+        statements = [self.visit(s) for s in node.body]
+        return foreach_template.format(name=name, type=ab_type, constraints=constraints, code='\n'.join(statements))
 
     @staticmethod
     def visit_Name(node: ast.Name) -> str:
@@ -90,6 +211,8 @@ class Latex(ast.ASTVisitor):
         def need_braces(node: ast.Expression) -> bool:
             if isinstance(node, ast.BinaryOp) and node.op in [ast.BinaryOp.Ops.POW, ast.BinaryOp.Ops.DIV]:
                 return False
+            elif isinstance(node, ast.Function):
+                return False
             elif ast.is_atom(node):
                 return False
             else:
@@ -103,15 +226,63 @@ class Latex(ast.ASTVisitor):
             if need_braces(node.right):
                 right = f'\\left({right}\\right)'
 
-        op_str = node.op.value if node.op != ast.BinaryOp.Ops.MUL else '\\cdot'
+        op_str = node.op.value if node.op != ast.BinaryOp.Ops.MUL else ''
 
         if node.op == ast.BinaryOp.Ops.DIV:
             return f'\\frac{{{left}}}{{{right}}}'
         else:
             return f'{{{left}}} {op_str} {{{right}}}'
 
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> str:
+        expr = self.visit(node.expr)
+        op = node.op.value.lower()
+        return f'{op} {expr}'
+
     def visit_Sum(self, node: ast.Sum) -> str:
         name = self.visit(node.name)
         expr = self.visit(node.expr)
 
         return f'\\sum_{{{name}}} \\left({expr}\\right)'
+
+    def visit_Predicate(self, node: ast.Predicate) -> str:
+        args = [self.visit(arg) for arg in node.args]
+        if node.name == 'bonded':
+            return f'${args[0]}$ is bonded to ${args[1]}$'
+        elif node.name == 'bond_distance':
+            return f'${args[0]}$ is ${args[2]}$ bonds apart from ${args[1]}$'
+        elif node.name == 'element':
+            return f'${args[0]}$ is {args[1]}'
+        elif node.name == 'near':
+            return f'${args[0]}$ is within ${args[2]}$ angstroms from ${args[1]}$'
+
+        return f'{node.name}({args})'
+
+    def visit_RelOp(self, node: ast.RelOp) -> str:
+        d = {
+            ast.RelOp.Ops.LE: r'\leq',
+            ast.RelOp.Ops.GE: r'\geq',
+            ast.RelOp.Ops.NEQ: r'\neq'
+        }
+
+        lhs = self.visit(node.lhs)
+        rhs = self.visit(node.rhs)
+        op = d.get(node.op, node.op.value)
+        return f'${lhs}$ {op} ${rhs}$'
+
+    def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:
+        lhs = self.visit(node.lhs)
+        rhs = self.visit(node.rhs)
+        op = node.op.value.lower()
+        return f'{lhs} {op} {rhs}'
+
+    def visit_UnaryLogicalOp(self, node: ast.UnaryLogicalOp) -> str:
+        constraint = self.visit(node.constraint)
+        op = node.op.value.lower()
+        return f'{op} {constraint}'
+
+    def visit_Function(self, node: ast.Function) -> str:
+        arg = self.visit(node.arg)
+        if node.name == 'inv':
+            return f'{arg} ^ {{-1}}'
+
+        return f'{node.name}({arg})'
