@@ -1,1 +1,1 @@
-"""Syntax highlighting for CCL and backend langugages"""
+"""Syntax highlighting for CCL and backend languages"""

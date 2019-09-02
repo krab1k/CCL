@@ -83,7 +83,7 @@ class FunctionType(CCLType):
 
 
 class PredicateType(FunctionType):
-    """Functions returing boolean"""
+    """Functions returning boolean"""
     def __init__(self, *args: Union[ObjectType, NumericType, Type[StringType]]):
         super().__init__(BoolType, *args)
 

@@ -2,6 +2,7 @@ mypy.ini
 .idea
 .pyre
 .pyre_configuration
+tmp
 docs/build/*
 **/__pycache__/*
 **/.mypy_cache/*

@@ -23,7 +23,7 @@ def test_examples_cpp(method):
     except Exception as e:
         pytest.fail(f'{method}: {e}')
 
-    args = ['cmake', '.', '-DCHARGEFW2_DIR=/home/charge/chargefw2']
+    args = ['cmake', '.', '-DCHARGEFW2_DIR=/tmp/chargefw2']
     p = subprocess.run(args, cwd=tmpdir, stderr=subprocess.PIPE)
     if p.returncode:
         pytest.fail(f'Cmake failed: {p.stderr.decode("utf-8")}')
