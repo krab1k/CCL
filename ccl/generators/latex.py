@@ -36,6 +36,7 @@ latex_template = '''\
     
 \\pagestyle{{empty}}
 \\begin{{document}}
+\\noindent\\textbf{{{name}}}
 \\begin{{algorithmic}}[1]
 {method}
 \\end{{algorithmic}}
@@ -80,12 +81,16 @@ def add_article(word: str) -> str:
         return f'a {word}'
 
 
+def greek_if_needed(word: str) -> str:
+    return f'\\{word}' if word.capitalize() in GREEK_LETTERS else word
+
+
 def make_parameter_sentence(p_type: str, symbols: List[symboltable.ParameterSymbol]) -> str:
     if len(symbols) == 1:
-        return f'${symbols[0].name}$ is {add_article(p_type)} parameter'
+        return f'${greek_if_needed(symbols[0].name)}$ is {add_article(p_type)} parameter'
     else:
-        names = ', '.join(f'${s.name}$' for s in symbols[:-1])
-        return names + f' and ${symbols[-1].name}$ are {p_type} parameters'
+        names = ', '.join(f'${greek_if_needed(s.name)}$' for s in symbols[:-1])
+        return names + f' and ${greek_if_needed(symbols[-1].name)}$ are {p_type} parameters'
 
 
 class Latex(ast.ASTVisitor):
@@ -125,12 +130,12 @@ class Latex(ast.ASTVisitor):
             if parameters[p_type]:
                 sentences.append(make_parameter_sentence(p_type, parameters[p_type]))
 
-        sentences.extend(f'${s.name}$ is the {s.property.name} of {s.element}' for s in constants)
-        sentences.extend(f'${s.name}$ is {s.function.name}' for s in functions if s.name not in MATH_FUNCTIONS)
+        sentences.extend(f'${greek_if_needed(s.name)}$ is the {s.property.name} of {s.element}' for s in constants)
+        sentences.extend(f'${greek_if_needed(s.name)}$ is {s.function.name}' for s in functions if s.name not in MATH_FUNCTIONS)
 
         for s in objects:
             constraints = ' such that ' + self.visit(s.constraints) if s.constraints else ''
-            sentences.append(f'${s.name}$ is {add_article(s.type.value.lower())}{constraints}')
+            sentences.append(f'${greek_if_needed(s.name)}$ is {add_article(s.type.value.lower())}{constraints}')
 
         return sentences
 
@@ -141,9 +146,9 @@ class Latex(ast.ASTVisitor):
         substitutions = []
         for s in self._substitutions:
             if s.indices:
-                lhs = f'{s.name}_{{{", ".join(self.visit(idx) for idx in s.indices)}}}'
+                lhs = f'{greek_if_needed(s.name)}_{{{", ".join(self.visit(idx) for idx in s.indices)}}}'
             else:
-                lhs = f'{s.name}'
+                lhs = f'{greek_if_needed(s.name)}'
             if len(s.rules) == 1:
                 substitutions.append(f'{lhs} &=& {self.visit(s.rules[None])}\\\\')
             else:
@@ -194,7 +199,7 @@ class Latex(ast.ASTVisitor):
         annotations_str = ', '.join(annotations) + '.'
 
         if self._full_output:
-            return latex_template.format(method=method, equalizations=equalizations,
+            return latex_template.format(name=node.name, method=method, equalizations=equalizations,
                                          substitutions=substitutions, annotations=annotations_str)
         else:
             return method + equalizations + substitutions + annotations_str
@@ -230,11 +235,7 @@ class Latex(ast.ASTVisitor):
                                        code='\n'.join(statements))
 
     def visit_Name(self, node: ast.Name) -> str:
-        if node.val.capitalize() in GREEK_LETTERS:
-            name = f'\\{node.val}'
-        else:
-            name = node.val
-
+        name = greek_if_needed(node.val)
         s = self._symbol_table.resolve(node.val)
         if isinstance(s, symboltable.VariableSymbol) and isinstance(s.symbol_type, types.ArrayType):
             return f'\\bm{{{name}}}'
@@ -328,8 +329,10 @@ class Latex(ast.ASTVisitor):
         arg = self.visit(node.arg)
         if node.name == 'inv':
             return f'{arg} ^ {{-1}}'
+        elif node.name == 'sqrt':
+            return f'\\sqrt{{{arg}}}'
 
-        return f'{node.name}({arg})'
+        return f'\\mathrm{{{node.name}}}({arg})'
 
     def visit_EE(self, node: ast.EE) -> str:
         self._ee_expressions.append(node)

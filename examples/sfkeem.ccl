@@ -1,4 +1,4 @@
-name sfkeem
+name SFKEEM
 
 q = EE[i, j](2 * B[i], 2 * sqrt(B[i] * B[j]) / cosh(sigma * R[i, j]), -A[i])
 

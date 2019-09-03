@@ -1,4 +1,4 @@
-name mpeoe
+name MPEOE
 
 for alpha = 1 to 6:
     for each atom i:

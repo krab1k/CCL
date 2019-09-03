@@ -1,4 +1,4 @@
-name charge2
+name Charge2
 
 for each atom i:
     alpha = sum[j]((E[j] - E[i]) / a[i])

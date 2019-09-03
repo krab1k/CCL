@@ -1,4 +1,4 @@
-name gdac
+name GDAC
 for alpha = 0 to 10:
     for each atom i:
         chi[i] = q[i] * A[i] + B[i]

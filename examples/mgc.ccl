@@ -1,4 +1,4 @@
-name mgc
+name MGC
 
 g = 1.0
 for each atom i:

@@ -1,4 +1,4 @@
-name eem
+name EEM
 
 q = EE[i, j](B[i], 1 / R[i, j], -A[i])
 

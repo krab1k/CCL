@@ -1,4 +1,4 @@
-name peoe
+name PEOE
 for alpha = 0 to 6:
     for each atom i:
         chi[i] = C[i] * q[i] ^ 2 + B[i] * q[i] + A[i]
