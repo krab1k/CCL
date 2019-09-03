@@ -4,7 +4,7 @@
 from typing import List, DefaultDict
 from collections import defaultdict
 
-from ccl import ast, symboltable
+from ccl import ast, symboltable, types
 from ccl.functions import MATH_FUNCTIONS
 
 
@@ -21,6 +21,7 @@ latex_template = '''\
 \\usepackage{{etoolbox}}
 \\usepackage{{amsmath}}
 \\usepackage{{amssymb}}
+\\usepackage{{bm}}
 
 \\algblockdefx[ForEach]{{ForEach}}{{EndForEach}}%
     [3]{{\\textbf{{for $\\forall$ #1}} $#2$\\notblank{{#3}}{{\\textbf{{ such that}} #3}}{{}}:}}%
@@ -29,13 +30,19 @@ latex_template = '''\
 \\algblockdefx[For]{{For}}{{EndFor}}%
     [3]{{\\textbf{{for $#1 = #2$ to $#3$}}:}}%
     {{}}
+    
+\\algtext*{{EndForEach}}
+\\algtext*{{EndFor}}
+    
 \\pagestyle{{empty}}
 \\begin{{document}}
-\\begin{{algorithmic}}
+\\begin{{algorithmic}}[1]
 {method}
 \\end{{algorithmic}}
+\\bigskip
 where
 {substitutions}
+{equalizations}
 {annotations}
 \\end{{document}}
 '''
@@ -83,10 +90,11 @@ def make_parameter_sentence(p_type: str, symbols: List[symboltable.ParameterSymb
 
 class Latex(ast.ASTVisitor):
     def __init__(self, table: symboltable.SymbolTable, **kwargs: bool) -> None:
-        self.symbol_table: symboltable.SymbolTable = table
-        self.full_output: bool = kwargs.get('full_output', False)
+        self._symbol_table: symboltable.SymbolTable = table
+        self._full_output: bool = kwargs.get('full_output', False)
 
         self._substitutions: List[symboltable.SubstitutionSymbol] = []
+        self._ee_expressions: List[ast.EE] = []
 
     def process_symbols(self) -> List[str]:
         sentences = []
@@ -95,8 +103,8 @@ class Latex(ast.ASTVisitor):
         functions = []
         objects = []
 
-        assert self.symbol_table.parent is not None
-        for s in self.symbol_table.parent.symbols.values():
+        assert self._symbol_table.parent is not None
+        for s in self._symbol_table.parent.symbols.values():
             if isinstance(s, symboltable.ParameterSymbol):
                 if s.symbol_type == ast.ParameterType.ATOM:
                     parameters['atom'].append(s)
@@ -149,22 +157,47 @@ class Latex(ast.ASTVisitor):
 
         return substitutions_template.format(substitutions='\n'.join(substitutions))
 
+    def process_EE(self) -> str:
+        if not self._ee_expressions:
+            return ''
+
+        equalizations = []
+        for i, ee in enumerate(self._ee_expressions):
+            res = f'$\\bm{{q^{i}}}$ is a solution to a system of N linear equations in a form\n'
+            if isinstance(ee.rhs, ast.UnaryOp) and ee.rhs.op == ast.UnaryOp.Ops.NEG:
+                rhs = self.visit(ee.rhs.expr)
+            else:
+                rhs = f'-{self.visit(ee.rhs)}'
+            off = self.visit(ee.off)
+            diag = self.visit(ee.diag)
+            res += f'\\[\\chi_{ee.idx_row} = {rhs} + {diag}\\bm{{q}}_{ee.idx_row} +' \
+                   f'\\sum_{{{ee.idx_row} \\neq {ee.idx_col}}} {off}\\]'
+            res += f'subject to $\\sum \\bm{{q}}_{ee.idx_row} = Q$,'
+            equalizations.append(res)
+
+        return '\n'.join(equalizations)
+
     def visit_Method(self, node: ast.Method) -> str:
         method = '\n'.join(self.visit(statement) for statement in node.statements)
 
-        annotations = ['$q$ is a vector of atomic charges']
+        annotations = ['$\\bm{q}$ is a vector of atomic charges']
         annotations.extend(self.process_symbols())
 
+        equalizations = self.process_EE()
+        if equalizations:
+            annotations.insert(1, '$Q$ is a total molecular charge')
+
         substitutions = self.process_substitutions()
-        if substitutions != '':
+        if substitutions:
             annotations[0] = f'and {annotations[0]}'
 
         annotations_str = ', '.join(annotations) + '.'
 
-        if self.full_output:
-            return latex_template.format(method=method, substitutions=substitutions, annotations=annotations_str)
+        if self._full_output:
+            return latex_template.format(method=method, equalizations=equalizations,
+                                         substitutions=substitutions, annotations=annotations_str)
         else:
-            return method + substitutions + annotations_str
+            return method + equalizations + substitutions + annotations_str
 
     def visit_Assign(self, node: ast.Assign) -> str:
         lhs = self.visit(node.lhs)
@@ -186,16 +219,27 @@ class Latex(ast.ASTVisitor):
         else:
             ab_type = 'bond'
 
+        if node.atom_indices:
+            atoms = f' = ({node.atom_indices[0]}, {node.atom_indices[1]})'
+        else:
+            atoms = ''
+
         constraints = self.visit(node.constraints) if node.constraints else ''
         statements = [self.visit(s) for s in node.body]
-        return foreach_template.format(name=name, type=ab_type, constraints=constraints, code='\n'.join(statements))
+        return foreach_template.format(name=name + atoms, type=ab_type, constraints=constraints,
+                                       code='\n'.join(statements))
 
-    @staticmethod
-    def visit_Name(node: ast.Name) -> str:
+    def visit_Name(self, node: ast.Name) -> str:
         if node.val.capitalize() in GREEK_LETTERS:
-            return f'\\{node.val}'
+            name = f'\\{node.val}'
         else:
-            return node.val
+            name = node.val
+
+        s = self._symbol_table.resolve(node.val)
+        if isinstance(s, symboltable.VariableSymbol) and isinstance(s.symbol_type, types.ArrayType):
+            return f'\\bm{{{name}}}'
+        else:
+            return name
 
     @staticmethod
     def visit_Number(node: ast.Number) -> str:
@@ -267,7 +311,7 @@ class Latex(ast.ASTVisitor):
         lhs = self.visit(node.lhs)
         rhs = self.visit(node.rhs)
         op = d.get(node.op, node.op.value)
-        return f'${lhs}$ {op} ${rhs}$'
+        return f'${lhs} {op} {rhs}$'
 
     def visit_BinaryLogicalOp(self, node: ast.BinaryLogicalOp) -> str:
         lhs = self.visit(node.lhs)
@@ -286,3 +330,9 @@ class Latex(ast.ASTVisitor):
             return f'{arg} ^ {{-1}}'
 
         return f'{node.name}({arg})'
+
+    def visit_EE(self, node: ast.EE) -> str:
+        self._ee_expressions.append(node)
+
+        res = f'\\bm{{q^{len(self._ee_expressions) - 1}}}'
+        return res
