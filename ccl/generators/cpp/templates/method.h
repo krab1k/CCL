@@ -17,9 +17,9 @@ public:
 
     virtual ~{method_name}() = default;
 
-    std::vector<double> calculate_charges(const Molecule &molecule) const override;
+    [[nodiscard]] std::vector<double> calculate_charges(const Molecule &molecule) const override;
 
-    std::vector<RequiredFeatures> get_requirements() const override {{
+    [[nodiscard]] std::vector<RequiredFeatures> get_requirements() const override {{
         return {{{required_features}}};
     }}
 
