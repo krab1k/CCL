@@ -20,13 +20,13 @@ sys.path.insert(0, os.path.abspath('_ext'))
 # -- Project information -----------------------------------------------------
 
 project = 'CCL'
-copyright = '2018, Tomáš Raček'
+copyright = '2019, Tomáš Raček'
 author = 'Tomáš Raček'
 
 # The short X.Y version
 version = ''
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+release = '0.1'
 
 
 # -- General configuration ---------------------------------------------------
@@ -68,7 +68,7 @@ language = None
 exclude_patterns = []
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'default'
+pygments_style = 'colorful'
 
 
 # -- Options for HTML output -------------------------------------------------
