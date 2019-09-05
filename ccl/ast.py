@@ -41,6 +41,7 @@ class ASTNode:
 
 
 class HasSymbolTable:
+    """Node with own symbol table"""
     def __init__(self) -> None:
         self.symbol_table: Optional[SymbolTable] = None
 
@@ -48,11 +49,13 @@ class HasSymbolTable:
 class ASTVisitor:
     """General visitor for AST"""
     def visit(self, node: ASTNode) -> Any:
+        """Run appropriate visit method"""
         method = 'visit_' + node.__class__.__name__
         visitor = getattr(self, method, self.generic_visit)
         return visitor(node)
 
     def generic_visit(self, node: ASTNode) -> None:
+        """Visit all children nodes"""
         for _, value in node:
             if isinstance(value, (list, tuple)):
                 for item in value:
@@ -115,6 +118,7 @@ class Constraint(ASTNode):
 
 
 class Method(ASTNode, HasSymbolTable):
+    """CCL's main node representing method"""
     def __init__(self, pos: Tuple[int, int], name: str, statements: List[Statement],
                  annotations: List[Annotation]) -> None:
         super().__init__(pos)
@@ -123,6 +127,7 @@ class Method(ASTNode, HasSymbolTable):
         self.name: str = name
 
     def print_ast(self) -> None:
+        """Simple print of method's AST"""
         for statement in self.statements:
             print(statement)
 
@@ -131,20 +136,24 @@ class Method(ASTNode, HasSymbolTable):
 
 
 class Expression(ASTNode):
+    """Common class for every expression in CCL"""
     def __init__(self, pos: Tuple[int, int]) -> None:
         super().__init__(pos)
         self._result_type: Optional[Union[NumericType, ArrayType, ParameterType, ObjectType, FunctionType]] = None
 
     @property
     def result_type(self) -> Optional[Union[NumericType, ArrayType, ParameterType, ObjectType, FunctionType]]:
+        """Get the result type of an expression"""
         return self._result_type
 
     @result_type.setter
     def result_type(self, value: Union[NumericType, ArrayType, ParameterType, ObjectType, FunctionType]) -> None:
+        """Set the result type of an expression"""
         self._result_type = value
 
 
 class Number(Expression):
+    """Integer or floating point number"""
     def __init__(self, pos: Tuple[int, int], val: Union[int, float], ntype: NumericType) -> None:
         super().__init__(pos)
         self.val: Union[int, float] = val
@@ -164,6 +173,7 @@ class Number(Expression):
 
 
 class Name(Expression):
+    """Simple name"""
     def __init__(self, pos: Tuple[int, int], name: str) -> None:
         super().__init__(pos)
         self.val: str = name
@@ -182,7 +192,9 @@ class Name(Expression):
 
 
 class BinaryOp(Expression):
+    """Binary operation"""
     class Ops(NoValEnum):
+        """Enum of all binary operations"""
         ADD = '+'
         SUB = '-'
         MUL = '*'
@@ -197,7 +209,9 @@ class BinaryOp(Expression):
 
 
 class UnaryOp(Expression):
+    """Unary operation"""
     class Ops(Enum):
+        """Enum of all unary operations"""
         NEG = '-'
 
     def __init__(self, pos: Tuple[int, int], op: 'UnaryOp.Ops', expr: Expression) -> None:
@@ -207,6 +221,7 @@ class UnaryOp(Expression):
 
 
 class Sum(Expression):
+    """Summation"""
     def __init__(self, pos: Tuple[int, int], name: Name, expr: Expression) -> None:
         super().__init__(pos)
         self.name: Name = name
@@ -214,6 +229,7 @@ class Sum(Expression):
 
 
 class Subscript(Expression):
+    """Indexed name"""
     def __init__(self, pos: Tuple[int, int], name: Name, indices: Tuple[Name, ...]) -> None:
         super().__init__(pos)
         self.name: Name = name
@@ -225,6 +241,7 @@ class Subscript(Expression):
 
 
 class Function(Expression):
+    """Math function"""
     def __init__(self, pos: Tuple[int, int], name: str, arg: Expression) -> None:
         super().__init__(pos)
         self.name: str = name
@@ -232,7 +249,9 @@ class Function(Expression):
 
 
 class EE(Expression):
+    """Electronegativity equalization scheme"""
     class Type(NoValEnum):
+        """Enum of types of EE schemes"""
         FULL = 'Full'
         CUTOFF = 'Cutoff'
         COVER = 'Cover'
@@ -250,6 +269,7 @@ class EE(Expression):
 
 
 class Assign(Statement):
+    """Assignment"""
     def __init__(self, pos: Tuple[int, int], lhs: Union[Name, Subscript], rhs: Expression) -> None:
         super().__init__(pos)
         self.lhs: Union[Name, Subscript] = lhs
@@ -257,6 +277,7 @@ class Assign(Statement):
 
 
 class For(Statement, HasSymbolTable):
+    """For loop"""
     def __init__(self, pos: Tuple[int, int], name: Name, value_from: Number, value_to: Number, body: List[Statement]) \
             -> None:
         super().__init__(pos)
@@ -267,6 +288,7 @@ class For(Statement, HasSymbolTable):
 
 
 class ForEach(Statement, HasSymbolTable):
+    """For each loop"""
     def __init__(self, pos: Tuple[int, int], name: Name, otype: ObjectType, atom_indices: Optional[Tuple[str, str]],
                  constraints: Constraint, body: List[Statement]) -> None:
         super().__init__(pos)
@@ -278,7 +300,9 @@ class ForEach(Statement, HasSymbolTable):
 
 
 class BinaryLogicalOp(Constraint):
+    """Binary logical operation"""
     class Ops(NoValEnum):
+        """Enum of all binary logical operations"""
         AND = 'And'
         OR = 'Or'
 
@@ -299,7 +323,9 @@ class BinaryLogicalOp(Constraint):
 
 
 class UnaryLogicalOp(Constraint):
+    """Unary logical operation"""
     class Ops(NoValEnum):
+        """Enum of all unarly logical operations"""
         NOT = 'Not'
 
     def __init__(self, pos: Tuple[int, int], op: 'UnaryLogicalOp.Ops', constraint: Constraint) -> None:
@@ -318,7 +344,9 @@ class UnaryLogicalOp(Constraint):
 
 
 class RelOp(Constraint):
+    """Compare operation"""
     class Ops(NoValEnum):
+        """Enum of all comparison operators"""
         LT = '<'
         LE = '<='
         GT = '>'
@@ -343,6 +371,7 @@ class RelOp(Constraint):
 
 
 class Predicate(Constraint):
+    """Predicate constraint"""
     def __init__(self, pos: Tuple[int, int], name: str, args: Tuple[Union[Number, Name], ...]) -> None:
         super().__init__(pos)
         self.name: str = name
@@ -359,6 +388,7 @@ class Predicate(Constraint):
 
 
 class Parameter(Annotation):
+    """Parameter annotation"""
     def __init__(self, pos: Tuple[int, int], name: str, ptype: ParameterType) -> None:
         super().__init__(pos)
         self.name: str = name
@@ -366,6 +396,7 @@ class Parameter(Annotation):
 
 
 class Substitution(Annotation):
+    """Substitution annotation"""
     def __init__(self, pos: Tuple[int, int], lhs: Union[Name, Subscript], rhs: Expression,
                  constraints: Optional[Constraint]) -> None:
         super().__init__(pos)
@@ -375,6 +406,7 @@ class Substitution(Annotation):
 
 
 class Object(Annotation):
+    """Object annotation"""
     def __init__(self, pos: Tuple[int, int], name: str, otype: ObjectType, atom_indices: Optional[Tuple[str, str]],
                  constraints: Optional[Constraint]) -> None:
         super().__init__(pos)
@@ -385,6 +417,7 @@ class Object(Annotation):
 
 
 class Property(Annotation):
+    """Property annotation"""
     def __init__(self, pos: Tuple[int, int], name: str, prop: str) -> None:
         super().__init__(pos)
         self.name: str = name
@@ -392,6 +425,7 @@ class Property(Annotation):
 
 
 class Constant(Annotation):
+    """Constant annotation"""
     def __init__(self, pos: Tuple[int, int], name: str, prop: str, element: str) -> None:
         super().__init__(pos)
         self.name: str = name
@@ -400,6 +434,7 @@ class Constant(Annotation):
 
 
 def is_atom(node: ASTNode) -> bool:
+    """Check whether a node represents a simple atomic expression"""
     if isinstance(node, Subscript):
         return True
     if isinstance(node, Name):

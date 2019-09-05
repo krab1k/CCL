@@ -7,7 +7,6 @@ from ccl.common import NoValEnum
 
 class CCLType:
     """Baseclass type"""
-    pass
 
 
 class StringType(CCLType):
@@ -59,6 +58,7 @@ class ArrayType(CCLType):
         return self.indices == other.indices
 
     def dim(self) -> int:
+        """Get number of dimensions"""
         return len(self.indices)
 
 
