@@ -18,8 +18,7 @@ expr: <assoc=right> left=expr op=POW right=expr                 #BinOp
     | LP expr RP                                                #ParenOp
     | SUM LB identifier=ID RB LP expr RP                        #SumOp
     | EE LB idx_row=ID COMMA idx_col=ID RB
-      LP diag=expr COMMA off=expr COMMA rhs=expr
-      (COMMA ee_type=(CUTOFF | COVER) radius=number)? RP        #EEExpr
+      LP diag=expr COMMA off=expr COMMA rhs=expr RP             #EEExpr
     | fn=ID LP fn_arg=expr RP                                   #FnExpr
     | var                                                       #VarExpr
     | number                                                    #NumberExpr

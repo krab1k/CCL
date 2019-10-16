@@ -198,11 +198,4 @@ class Parser(CCLVisitor):
         diag = self.visit(ctx.diag)
         off = self.visit(ctx.off)
         rhs = self.visit(ctx.rhs)
-        if ctx.ee_type is not None:
-            ee_type = ast.EE.Type(ctx.ee_type.text.capitalize())
-            radius = self.visit(ctx.radius)
-        else:
-            ee_type = ast.EE.Type.FULL
-            radius = None
-
-        return ast.EE(self.get_pos(ctx), ctx.idx_row.text, ctx.idx_col.text, diag, off, rhs, ee_type, radius)
+        return ast.EE(self.get_pos(ctx), ctx.idx_row.text, ctx.idx_col.text, diag, off, rhs)

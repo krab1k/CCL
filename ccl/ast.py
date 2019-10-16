@@ -257,15 +257,13 @@ class EE(Expression):
         COVER = 'Cover'
 
     def __init__(self, pos: Tuple[int, int], idx_row: str, idx_col: str, diag: Expression, off: Expression,
-                 rhs: Expression, ee_type: 'EE.Type', radius: Optional[NumericType]) -> None:
+                 rhs: Expression) -> None:
         super().__init__(pos)
         self.idx_row: str = idx_row
         self.idx_col: str = idx_col
         self.diag: Expression = diag
         self.off: Expression = off
         self.rhs: Expression = rhs
-        self.type: 'EE.Type' = ee_type
-        self.radius: Optional[NumericType] = radius
 
 
 class Assign(Statement):
