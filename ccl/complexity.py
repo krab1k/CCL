@@ -3,9 +3,16 @@
 import sympy
 
 from ccl import ast, symboltable
+from ccl.parser import process_source
 
 
 OBJECT_COMPLEXITY = {ast.ObjectType.ATOM: 'N', ast.ObjectType.BOND: 'M'}
+
+
+def complexity(source: str, asymptotic: bool = True) -> str:
+    """Return complexity of a method in CCL"""
+    method_ast, table = process_source(source)
+    return Complexity(table, asymptotic=asymptotic).visit(method_ast)
 
 
 class Complexity(ast.ASTVisitor):
@@ -23,7 +30,6 @@ class Complexity(ast.ASTVisitor):
         statements_complexity = [self.visit(statement) for statement in node.statements]
 
         raw_complexity = ' + '.join(init_complexity + statements_complexity)
-        print(raw_complexity)
         ns = {'N': sympy.Symbol('N'), 'M': sympy.Symbol('M')}
         if self._asymptotic:
             res = sympy.sympify(f'O({raw_complexity}, (M, oo), (N, oo))', locals=ns)
@@ -42,7 +48,13 @@ class Complexity(ast.ASTVisitor):
         return f'{mult} * ({body} + {constraints})'
 
     def visit_Assign(self, node: ast.Assign) -> str:
-        return self.visit(node.rhs)
+        assign = '1'
+        if isinstance(node.lhs, ast.Name):
+            s = self.symbol_table.resolve(node.lhs.val)
+            if isinstance(s.symbol_type, ast.ArrayType):
+                assign = ' * '.join(OBJECT_COMPLEXITY[idx] for idx in s.symbol_type.indices)
+
+        return f'{assign} + {self.visit(node.rhs)}'
 
     def visit_Number(self, node: ast.Number) -> str:
         return '0'

@@ -2,6 +2,7 @@ import sys
 
 from ccl.errors import CCLError, CCLCodeError
 from ccl.translate import translate
+from ccl.complexity import complexity
 
 if len(sys.argv) != 2:
     print('Not enough arguments')
@@ -18,6 +19,7 @@ print(data)
 print('\n*** Translated ****\n')
 try:
     print(translate(data, 'latex', full_output=True))
+    print('Complexity: ', complexity(data, asymptotic=True))
 except CCLCodeError as e:
     print('\nERROR: ' + str(e.message))
     print(f'\n{e.line:2d}:', data.split('\n')[e.line - 1])

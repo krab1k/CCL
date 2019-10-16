@@ -2,28 +2,15 @@
 
 import importlib
 from typing import Optional, Union
-import antlr4
 
-import ccl.antlr.CCL_Lexer as CCL_Lexer
-import ccl.antlr.CCL as CCL_Parser
+from ccl.parser import process_source
 from ccl.errors import CCLError
-from ccl.symboltable import SymbolTable
-from ccl.parser import Parser, CCLErrorListener
 
 
 def translate(source: str, output_language: Optional[str] = None, **kwargs: Union[str, bool]) -> Optional[str]:
     """Translate CCL into the given output language"""
 
-    lexer = CCL_Lexer.CCL_Lexer(antlr4.InputStream(source))
-    token_stream = antlr4.CommonTokenStream(lexer)
-    parser = CCL_Parser.CCL(token_stream)
-    parser._listeners = [CCLErrorListener()]
-
-    tree = parser.method()  # type: ignore
-    ccl_parser = Parser()
-    ast = ccl_parser.visit(tree)
-    table = SymbolTable.create_from_ast(ast)
-
+    ast, table = process_source(source)
     if output_language is not None:
         try:
             module = importlib.import_module(f'ccl.generators.{output_language}')
@@ -36,7 +23,6 @@ def translate(source: str, output_language: Optional[str] = None, **kwargs: Unio
             raise RuntimeError(f'No such language: {output_language}')
 
         g = generator(table, **kwargs)
-        code = str(g.visit(ast))
-        return code
+        return str(g.visit(ast))
     else:
         return None

@@ -6,13 +6,26 @@ from antlr4.error.ErrorListener import ErrorListener
 from antlr4.Token import CommonToken
 from ccl.antlr.CCLVisitor import CCLVisitor
 from ccl.antlr import CCL as CCL_Parser
-
+from ccl.antlr import CCL_Lexer as CCL_Lexer
 
 import ccl.ast as ast
+import ccl.symboltable as symboltable
 from ccl.errors import CCLSyntaxError
 
 
-__all__ = ['CCLErrorListener', 'Parser']
+def process_source(source: str) -> Tuple[ast.ASTNode, symboltable.SymbolTable]:
+    """Return AST and symbol table for a given source in CCL"""
+    lexer = CCL_Lexer.CCL_Lexer(antlr4.InputStream(source))
+    token_stream = antlr4.CommonTokenStream(lexer)
+    parser = CCL_Parser.CCL(token_stream)
+    parser._listeners = [CCLErrorListener()]
+
+    tree = parser.method()  # type: ignore
+    ccl_parser = Parser()
+    method_ast = ccl_parser.visit(tree)
+    table = symboltable.SymbolTable.create_from_ast(method_ast)
+
+    return method_ast, table
 
 
 # noinspection PyPep8Naming
