@@ -665,25 +665,31 @@ class SymbolTableBuilder(ast.ASTVisitor):
 class NameGetter:
     """Get all names used within a particular AST node"""
 
-    @classmethod
-    def visit(cls, node: ast.ASTNode, table: SymbolTable) -> Set[str]:
+    def __init__(self) -> None:
+        self._substitution_symbols: Set[str] = set()
+
+    def visit(self, node: ast.ASTNode, table: SymbolTable) -> Set[str]:
         names = set()
         if isinstance(node, ast.Name):
+            if node.val in self._substitution_symbols:
+                return set()
             if node.val.lower() not in ELEMENT_NAMES:
                 names.add(node.val)
             symbol = table.resolve(node.val)
             if symbol is not None and isinstance(symbol, SubstitutionSymbol):
+                self._substitution_symbols.add(symbol.name)
                 for cond, expr in symbol.rules.items():
                     if cond is not None:
-                        names |= cls.visit(cond, table)
-                    names |= cls.visit(expr, table)
+                        names |= self.visit(cond, table)
+                    names |= self.visit(expr, table)
                 names -= {idx.val for idx in symbol.indices}
+                self._substitution_symbols.remove(symbol.name)
         for _, value in node:
             if isinstance(value, (list, tuple)):
                 for item in value:
                     if isinstance(item, ast.ASTNode):
-                        names = names | cls.visit(item, table)
+                        names = names | self.visit(item, table)
             elif isinstance(value, ast.ASTNode):
-                names = names | cls.visit(value, table)
+                names = names | self.visit(value, table)
 
         return names

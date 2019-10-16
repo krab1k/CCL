@@ -145,8 +145,8 @@ class Cpp(ast.ASTVisitor):
                     required_names: Set[str] = set()
                     for cond, expr in symbol.rules.items():
                         if cond is not None:
-                            required_names |= symboltable.NameGetter.visit(cond, self.symbol_table)
-                        required_names |= symboltable.NameGetter.visit(expr, self.symbol_table)
+                            required_names |= symboltable.NameGetter().visit(cond, self.symbol_table)
+                        required_names |= symboltable.NameGetter().visit(expr, self.symbol_table)
 
                     if 'q' in required_names:
                         self.substitutions_needing_q.add(name)
