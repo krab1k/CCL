@@ -60,20 +60,20 @@ double {method_name}::{name}({args}) const {{
 
 substitution_prototype = 'double {name}({args}) const;'
 
-ee_prototype = 'Eigen::VectorXd ee_{number}({args}) const;'
+ee_prototype = 'Eigen::VectorXd _EE_{number}({args}) const;'
 
 ee_template = '''\
-Eigen::VectorXd {method_name}::ee_{number}({args}) const {{
-    auto n = static_cast<int>(molecule.atoms().size());
-    Eigen::VectorXd b = Eigen::VectorXd::Zero(n + 1);
+Eigen::VectorXd {method_name}::_EE_{number}({args}) const {{
+    size_t n = atoms.size();
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n + 1, n + 1);
+    Eigen::VectorXd b = Eigen::VectorXd::Zero(n + 1);
     
-    for (const auto &_{idx_row}: molecule.atoms()) {{
-        size_t {idx_row} = _{idx_row}.index();
-        b({idx_row}) = {rhs};
-        for (const auto &_{idx_col}: molecule.atoms()) {{
-            size_t {idx_col} = _{idx_col}.index();
-            if ({idx_row} == {idx_col}) {{
+    for (size_t i = 0; i < n; i++) {{
+        auto _{idx_row} = *atoms[i];
+        b(i) = {rhs};
+        for (size_t j = 0; j < n; j++) {{
+            auto _{idx_col} = *atoms[j];
+            if (i == j) {{
                 A({idx_row}, {idx_row}) = {diag};
             }} else {{
                 A({idx_row}, {idx_col}) = {off};
@@ -81,7 +81,7 @@ Eigen::VectorXd {method_name}::ee_{number}({args}) const {{
         }}
     }}
     
-    b(n) = molecule.total_charge();
+    b(n) = total_charge;
     A.row(n) = Eigen::VectorXd::Constant(n + 1, 1.0);
     A.col(n) = Eigen::VectorXd::Constant(n + 1, 1.0);
     A(n, n) = 0.0;
@@ -245,7 +245,10 @@ class Cpp(ast.ASTVisitor):
 
         required_features_str = ', '.join(self.required_features)
 
+        method_type = 'EEMethod' if self.ee_count else 'Method'
+
         header = header_template.format(method_name=node.name.capitalize(),
+                                        method_type=method_type,
                                         common_parameters_enum=common_parameters_enum_str,
                                         atom_parameters_enum=atom_parameters_enum_str,
                                         bond_parameters_enum=bond_parameters_enum_str,
@@ -531,8 +534,7 @@ class Cpp(ast.ASTVisitor):
         diag_expr = self.visit(node.diag)
         rhs_expr = self.visit(node.rhs)
 
-        args_str = 'molecule'
-        formal_args_str = 'const Molecule &molecule'
+        formal_args_str = 'const std::vector<const Atom *> &atoms, double total_charge'
 
         self.defs.append(ee_template.format(method_name=self.method_name,
                                             number=number,
@@ -545,8 +547,7 @@ class Cpp(ast.ASTVisitor):
 
         self.prototypes.append(ee_prototype.format(number=number,
                                                    args=formal_args_str))
-
-        return f'ee_{number}({args_str})'
+        return f'solve_EE(molecule, std::bind(&{self.method_name}::_EE_{number}, this, _1, _2))'
 
     def visit_Function(self, node: ast.Function) -> str:
         arg = self.visit(node.arg)

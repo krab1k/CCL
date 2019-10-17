@@ -1,10 +1,13 @@
 #include <vector>
-#include <Eigen/Dense>
+#include <Eigen/LU>
+#include <functional>
 {sys_includes}
 
 #include "structures/molecule.h"
 #include "ccl_method.h"
 {user_includes}
+
+using namespace std::placeholders;
 
 {defs}
 

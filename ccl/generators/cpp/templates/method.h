@@ -2,18 +2,18 @@
 
 #include <vector>
 #include <boost/config.hpp>
-#include <Eigen/Dense>
+#include <Eigen/Core>
 
 #include "structures/molecule.h"
 #include "method.h"
 
-class {method_name} : public Method {{
+class {method_name} : public {method_type} {{
     {common_parameters_enum}
     {atom_parameters_enum}
     {bond_parameters_enum}
     {prototypes}
 public:
-    explicit {method_name}() : Method("{method_name}", {{{common_parameters}}}, {{{atom_parameters}}}, {{{bond_parameters}}}, {{}}) {{}};
+    explicit {method_name}() : {method_type}("{method_name}", {{{common_parameters}}}, {{{atom_parameters}}}, {{{bond_parameters}}}, {{}}) {{}};
 
     virtual ~{method_name}() = default;
 
