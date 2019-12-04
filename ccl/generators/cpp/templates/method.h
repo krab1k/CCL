@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <boost/config.hpp>
 #include <Eigen/Core>
 
 #include "structures/molecule.h"
@@ -24,6 +23,3 @@ public:
     }}
 
 }};
-
-extern "C" BOOST_SYMBOL_EXPORT {method_name} method;
-{method_name} method;

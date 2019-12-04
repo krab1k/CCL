@@ -7,6 +7,8 @@
 #include "ccl_method.h"
 {user_includes}
 
+CHARGEFW2_METHOD({method_name})
+
 using namespace std::placeholders;
 
 {defs}
