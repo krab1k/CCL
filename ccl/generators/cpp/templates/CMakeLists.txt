@@ -3,8 +3,6 @@ project(method)
 
 set(CMAKE_INSTALL_SO_NO_EXE 1)
 
-add_definitions(-DEIGEN_USE_MKL_ALL)
-
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 
 include_directories(${{CHARGEFW2_DIR}}/include)
