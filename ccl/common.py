@@ -15,6 +15,6 @@ class NoValEnum(Enum):
 
 
 ELEMENT_NAMES: Set[str] = set()
-with open(os.path.join('ccl', 'elements.txt')) as elements_file:
+with open(os.path.join(os.path.dirname(__file__), 'elements.txt')) as elements_file:
     for line in elements_file:
         ELEMENT_NAMES.add(line.strip().lower())

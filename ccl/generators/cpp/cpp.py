@@ -8,13 +8,13 @@ from ccl.functions import ELEMENT_PROPERTIES
 
 __all__ = ['Cpp']
 
-with open('ccl/generators/cpp/templates/method.h') as template_f:
+with open(os.path.join(os.path.dirname(__file__), 'templates', 'method.h')) as template_f:
     header_template = template_f.read()
 
-with open('ccl/generators/cpp/templates/method.cpp') as template_f:
+with open(os.path.join(os.path.dirname(__file__), 'templates', 'method.cpp')) as template_f:
     method_template = template_f.read()
 
-with open('ccl/generators/cpp/templates/CMakeLists.txt') as template_f:
+with open(os.path.join(os.path.dirname(__file__), 'templates', 'CMakeLists.txt')) as template_f:
     cmake_template = template_f.read()
 
 sys_include_template = '#include <{file}>'
