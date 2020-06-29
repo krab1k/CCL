@@ -13,7 +13,7 @@ import ccl.symboltable as symboltable
 from ccl.errors import CCLSyntaxError
 
 
-def process_source(source: str) -> Tuple[ast.ASTNode, symboltable.SymbolTable]:
+def process_source(source: str) -> Tuple[ast.Method, symboltable.SymbolTable]:
     """Return AST and symbol table for a given source in CCL"""
     lexer = CCL_Lexer.CCL_Lexer(antlr4.InputStream(source))
     token_stream = antlr4.CommonTokenStream(lexer)

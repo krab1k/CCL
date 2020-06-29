@@ -3,16 +3,9 @@
 import sympy
 
 from ccl import ast, symboltable
-from ccl.parser import process_source
 
 
 OBJECT_COMPLEXITY = {ast.ObjectType.ATOM: 'N', ast.ObjectType.BOND: 'M'}
-
-
-def complexity(source: str, asymptotic: bool = True) -> str:
-    """Return complexity of a method in CCL"""
-    method_ast, table = process_source(source)
-    return Complexity(table, asymptotic=asymptotic).visit(method_ast)
 
 
 class Complexity(ast.ASTVisitor):

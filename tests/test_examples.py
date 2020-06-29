@@ -2,7 +2,7 @@
 
 import pytest
 
-from ccl.translate import translate
+from ccl.method import CCLMethod
 from ccl.errors import CCLCodeError
 
 
@@ -11,7 +11,7 @@ def test_examples(method):
     with open(f'examples/{method}') as f:
         data = f.read()
     try:
-        translate(data, None)
+        CCLMethod(data)
     except CCLCodeError as e:
         line = data.split('\n')[e.line - 1]
         pytest.fail(f'{method}:{e.line}:{e.column}: {line}: {e.message}')

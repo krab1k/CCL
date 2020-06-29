@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QPlainTextEdit, QVBoxLayout, 
 from PyQt5.QtGui import QFont, QTextCursor, QTextBlockFormat, QColor
 
 import ccl.generators
-from ccl.translate import translate
+from ccl.method import CCLMethod
 from ccl.errors import CCLCodeError
 from ccl.gui.syntax.common import SyntaxHighlighter
 from ccl.gui.syntax.ccl import CCLHighlighter
@@ -56,7 +56,7 @@ class Editor(QWidget):
         data = self.editor.toPlainText()
         if data:
             try:
-                code = translate(data, self.language)
+                code = CCLMethod(data).translate(self.language)
                 assert code is not None
                 self.code.setPlainText(code)
                 self.status.setText('OK')

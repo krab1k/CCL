@@ -5,7 +5,7 @@ import tempfile
 import subprocess
 import shutil
 
-from ccl.translate import translate
+from ccl.method import CCLMethod
 from ccl.errors import CCLCodeError
 
 
@@ -15,7 +15,7 @@ def test_examples_cpp(method):
     with open(f'examples/{method}') as f:
         data = f.read()
     try:
-        translate(data, 'cpp', output_dir=tmpdir)
+        CCLMethod(data).translate('cpp', output_dir=tmpdir)
     except CCLCodeError as e:
         shutil.rmtree(tmpdir)
         line = data.split('\n')[e.line - 1]

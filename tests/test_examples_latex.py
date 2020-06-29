@@ -6,7 +6,7 @@ import shutil
 import os
 import subprocess
 
-from ccl.translate import translate
+from ccl.method import CCLMethod
 from ccl.errors import CCLCodeError
 
 
@@ -16,7 +16,7 @@ def test_examples_latex(method):
     with open(f'examples/{method}') as f:
         data = f.read()
     try:
-        code = translate(data, 'latex', full_output=True)
+        code = CCLMethod(data).translate('latex', full_output=True)
         assert code is not None
         with open(os.path.join(tmpdir, 'method.tex'), 'w') as f:
             f.write(code)

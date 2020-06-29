@@ -6,7 +6,7 @@ import shutil
 import os
 import subprocess
 
-from ccl.translate import translate
+from ccl.method import CCLMethod
 from ccl.errors import CCLCodeError
 
 
@@ -16,7 +16,7 @@ def test_examples_graphviz(method):
     with open(f'examples/{method}') as f:
         data = f.read()
     try:
-        code = translate(data, 'graphviz', annotate_results=True)
+        code = CCLMethod(data).translate('graphviz', annotate_results=True)
         assert code is not None
         with open(os.path.join(tmpdir, 'method.dot'), 'w') as f:
             f.write(code)
