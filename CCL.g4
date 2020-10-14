@@ -22,6 +22,7 @@ expr: <assoc=right> left=expr op=POW right=expr                 #BinOp
     | fn=ID LP fn_arg=expr RP                                   #FnExpr
     | var                                                       #VarExpr
     | number                                                    #NumberExpr
+    | REGRESSION_EXPR                                           #RegressionExpr
     ;
 
 var: basename | subscript;

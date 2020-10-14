@@ -48,6 +48,8 @@ GEQ: '>=';
 NEQ: '!=';
 EQQ: '==';
 
+REGRESSION_EXPR: '{}';
+
 COLON: ':';
 COMMA: ',';
 NUMBER: '-'? DIGIT+ ('.' DIGIT*)?;

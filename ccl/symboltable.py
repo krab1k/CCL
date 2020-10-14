@@ -139,6 +139,17 @@ class SymbolTable:
 
         self.symbols[symbol.name] = symbol
 
+    def get_symbols(self, recursive=False) -> Set[Symbol]:
+        symbols = set()
+        for symbol in self.symbols.values():
+            symbols.add(symbol)
+
+        if recursive:
+            if self.parent is not None:
+                symbols |= self.parent.get_symbols(recursive)
+
+        return symbols
+
     def print(self) -> None:
         for symbol in self.symbols.values():
             print(symbol)

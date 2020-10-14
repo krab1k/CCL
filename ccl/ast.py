@@ -39,6 +39,10 @@ class ASTNode:
         for attr in self.__dir__():
             yield attr, getattr(self, attr)
 
+    def __eq__(self, other):
+        if type(self) == type(other):
+            return all(x == y for x, y in zip(self, other))
+
 
 class HasSymbolTable:
     """Node with own symbol table"""
@@ -150,6 +154,17 @@ class Expression(ASTNode):
     def result_type(self, value: Union[NumericType, ArrayType, ParameterType, ObjectType, FunctionType]) -> None:
         """Set the result type of an expression"""
         self._result_type = value
+
+
+class RegressionExpr(Expression):
+    """CCL placeholder for symbolic regression"""
+
+    def __init__(self, pos: Tuple[int, int]) -> None:
+        super().__init__(pos)
+
+    @property
+    def result_type(self) -> NumericType:
+        return NumericType.FLOAT
 
 
 class Number(Expression):

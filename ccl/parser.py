@@ -212,3 +212,6 @@ class Parser(CCLVisitor):
         off = self.visit(ctx.off)
         rhs = self.visit(ctx.rhs)
         return ast.EE(self.get_pos(ctx), ctx.idx_row.text, ctx.idx_col.text, diag, off, rhs)
+
+    def visitRegressionExpr(self, ctx: CCL_Parser.CCL.RegressionExprContext) -> ast.RegressionExpr:
+        return ast.RegressionExpr(self.get_pos(ctx))

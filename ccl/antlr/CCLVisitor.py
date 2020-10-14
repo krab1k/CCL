@@ -64,6 +64,11 @@ class CCLVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by CCL#RegressionExpr.
+    def visitRegressionExpr(self, ctx:CCL.RegressionExprContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by CCL#VarExpr.
     def visitVarExpr(self, ctx:CCL.VarExprContext):
         return self.visitChildren(ctx)
