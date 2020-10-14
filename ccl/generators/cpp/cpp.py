@@ -115,7 +115,7 @@ class Cpp(ast.ASTVisitor):
 
         self.sys_includes: Set[str] = set()
         self.user_includes: Set[str] = set()
-        self.var_definitions: Dict[str, str] = {}
+        self.var_definitions: Dict[str, str] = {'q': f'Eigen::VectorXd _q = Eigen::VectorXd::Zero(n);'}
         self.method_name: str = ''
 
         self.defs: List[str] = []
