@@ -263,7 +263,7 @@ class Function(Expression):
         self.arg: Expression = arg
 
 
-class EE(Expression):
+class EE(Expression, HasSymbolTable):
     """Electronegativity equalization scheme"""
     class Type(NoValEnum):
         """Enum of types of EE schemes"""

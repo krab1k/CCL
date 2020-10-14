@@ -589,6 +589,7 @@ class SymbolTableBuilder(ast.ASTVisitor):
         table = SymbolTable(self.current_table)
         table.define(ObjectSymbol(node.idx_row, node, ObjectType.ATOM, None))
         table.define(ObjectSymbol(node.idx_col, node, ObjectType.ATOM, None))
+        node.symbol_table = table
 
         self._iterating_over |= {node.idx_row, node.idx_col}
         self.current_table = table
