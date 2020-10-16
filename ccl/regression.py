@@ -9,14 +9,16 @@ import math
 import subprocess
 import shutil
 import multiprocessing
+import numpy as np
 from typing import Optional
+import decimal
+import functools
 
 import ccl.ast
 import ccl.symboltable
 import ccl.types
 import ccl.functions
 import ccl.errors
-
 
 default_options = {
     'use_math_functions': False,
@@ -25,10 +27,13 @@ default_options = {
     'mutation_probability': 0.2,
     'generations': 10,
     'top_results': 5,
+    'unique_population': True,
     'parallelization': True,
     'ncpus': None,
     'seed': None,
-    'chargefw2_dir': '/opt/chargefw2'
+    'chargefw2_dir': '/opt/chargefw2',
+    'eigen_include': '/usr/include/eigen3',
+    'print_stats': True
 }
 
 
@@ -40,16 +45,17 @@ class BondObject:
     pass
 
 
-manager = multiprocessing.Manager()
-cache = manager.dict()
-
-
 def prepare_primitive_set(table: ccl.symboltable.SymbolTable, options: dict) -> Tuple[gp.PrimitiveSetTyped, dict]:
+    """Prepare set of primitives from which the individual is built"""
     input_types = []
     object_names = []
 
     atom_properties = []
     bond_properties = []
+
+    atom_parameters = []
+    bond_parameters = []
+    common_parameters = []
 
     distance_name = None
 
@@ -69,6 +75,13 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, options: dict) -> 
                 bond_properties.append(s.name)
             elif s.function.name == 'distance':
                 distance_name = s.name
+        elif isinstance(s, ccl.symboltable.ParameterSymbol):
+            if s.type == ccl.types.ParameterType.ATOM:
+                atom_parameters.append(s.name)
+            elif s.type == ccl.types.ParameterType.BOND:
+                bond_parameters.append(s.name)
+            else:
+                common_parameters.append(s.name)
 
     primitive_set = gp.PrimitiveSetTyped('MAIN', input_types, float)
 
@@ -78,6 +91,16 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, options: dict) -> 
     primitive_set.addPrimitive('mul', [float, float], float, 'mul')
     primitive_set.addPrimitive('div', [float, float], float, 'div')
     primitive_set.addPrimitive('atom', [AtomObject], AtomObject, 'atom')
+    primitive_set.addPrimitive('bond', [BondObject], BondObject, 'bond')
+
+    for ap in atom_parameters:
+        primitive_set.addPrimitive(ap, [AtomObject], float, ap)
+
+    for bp in bond_parameters:
+        primitive_set.addPrimitive(bp, [BondObject], float, bp)
+
+    for cp in common_parameters:
+        primitive_set.addTerminal(cp, float, cp)
 
     if options['use_math_functions']:
         for math_fn in ccl.functions.MATH_FUNCTIONS:
@@ -94,12 +117,14 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, options: dict) -> 
 
     primitive_set.renameArguments(**{f'ARG{i}': name for i, name in enumerate(object_names)})
 
-    functions = {'distance': distance_name, 'atom': atom_properties, 'bond': bond_properties}
+    functions = {'distance': distance_name, 'atom': atom_properties, 'bond': bond_properties,
+                 'atom_parameters': atom_parameters, 'bond_parameters': bond_parameters}
 
     return primitive_set, functions
 
 
 def generate_ccl_code(expr, functions):
+    """Generates unoptimized version of CCL code from an individual"""
     string = ''
     stack = []
     distance_name = functions.get('distance', None)
@@ -110,7 +135,7 @@ def generate_ccl_code(expr, functions):
             if prim.name == 'add':
                 string = f'({args[0]}) + ({args[1]})'
             elif prim.name == 'sub':
-                string = f'({args[0]}) + ({args[1]})'
+                string = f'({args[0]}) - ({args[1]})'
             elif prim.name == 'mul':
                 string = f'({args[0]}) * ({args[1]})'
             elif prim.name == 'div':
@@ -119,7 +144,8 @@ def generate_ccl_code(expr, functions):
                 string = f'{args[0]}'
             elif prim.name == distance_name:
                 string = f'{distance_name}[{args[0]}, {args[1]}]'
-            elif prim.name in functions['atom'] or prim.name in functions['bond']:
+            elif prim.name in functions['atom'] or prim.name in functions['bond'] or \
+                    prim.name in functions['atom_parameters'] or prim.name in functions['bond_parameters']:
                 string = f'{prim.name}[{args[0]}]'
             else:
                 string = prim.format(*args)
@@ -130,10 +156,79 @@ def generate_ccl_code(expr, functions):
     return string
 
 
-def evaluate(individual, method_skeleton: 'CCLMethod', functions, data: dict, options: dict) -> Tuple[float]:
-    new_expr = generate_ccl_code(individual, functions)
+def generate_optimized_ccl_code(expr, functions) -> Optional[str]:
+    """Generates somewhat optimized CCL code for an individual"""
+    string = ''
+    stack = []
+    distance_name = functions.get('distance', None)
+    for node in expr:
+        stack.append((node, []))
+        while len(stack[-1][1]) == stack[-1][0].arity:
+            prim, args = stack.pop()
+            if prim.name == 'add':
+                try:
+                    string = str(decimal.Decimal(args[0]) + decimal.Decimal(args[1]))
+                except decimal.InvalidOperation:
+                    string = f'{args[0]} + {args[1]}'
+            elif prim.name == 'sub':
+                try:
+                    string = str(decimal.Decimal(args[0]) - decimal.Decimal(args[1]))
+                except decimal.InvalidOperation:
+                    string = f'{args[0]} - {args[1]}'
+            elif prim.name == 'mul':
+                if args[0] == '0.0' or args[1] == '0.0':
+                    string = '0.0'
+                elif args[0] == '1.0':
+                    string = args[1]
+                elif args[1] == '1.0':
+                    string = args[0]
+                else:
+                    string = f'({args[0]}) * ({args[1]})'
+            elif prim.name == 'div':
+                if args[1] == '0.0':
+                    return None
+                if args[0] == args[1]:
+                    string = '1.0'
+                elif args[1] == '1.0':
+                    string = args[0]
+                else:
+                    string = f'({args[0]}) / ({args[1]})'
+            elif prim.name == 'atom':
+                string = args[0]
+            elif prim.name == distance_name:
+                if args[0] == args[1]:
+                    string = '0.0'
+                elif args[0] < args[1]:
+                    string = f'{distance_name}[{args[0]}, {args[1]}]'
+                else:
+                    string = f'{distance_name}[{args[1]}, {args[0]}]'
+            elif prim.name in functions['atom'] or prim.name in functions['bond'] or \
+                    prim.name in functions['atom_parameters'] or prim.name in functions['bond_parameters']:
+                string = f'{prim.name}[{args[0]}]'
+            else:
+                string = prim.format(*args)
+            if len(stack) == 0:
+                break  # If stack is empty, all nodes should have been seen
+            stack[-1][1].append(string)
+
+    return string
+
+
+def individual_eq(first, second, functions):
+    """Test whether the two individuals would have a same CCL code representation"""
+    return generate_optimized_ccl_code(first, functions) == generate_optimized_ccl_code(second, functions)
+
+
+def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, data: dict, options: dict) -> Tuple[
+        float]:
+    """Evaluate individual by calculating RMSD between new and reference charges"""
+    new_expr = generate_optimized_ccl_code(individual, functions)
+
+    if new_expr is None:
+        return (math.inf,)
 
     if new_expr in cache:
+        print(f'Cached (RMSD = {cache[new_expr]:.3f}): {new_expr}')
         return (cache[new_expr],)
 
     new_source = method_skeleton.source.format(f'({new_expr})')
@@ -145,16 +240,17 @@ def evaluate(individual, method_skeleton: 'CCLMethod', functions, data: dict, op
         new_method.translate('cpp', output_dir=tmpdir)
     except ccl.errors.CCLCodeError as e:
         line = new_source.split('\n')[e.line - 1]
-        print(f'CCL Compilation Error: {e.line}:{e.column}: {line}: {e.message}')
+        print(f'CCL Compilation Error: {e.line}:{e.column}: {line}: {e.message}', file=sys.stderr)
         return (math.inf,)
     except Exception as e:
-        print(f'Unknown error during compilation: {e}')
+        print(f'Unknown error during compilation: {e}', file=sys.stderr)
         print(new_source)
         return (math.inf,)
 
     chargefw2_dir = options['chargefw2_dir']
 
-    args = ['g++', '-O1', '-c', '-fPIC', '-isystem/usr/include/eigen3', 'ccl_method.cpp', f'-I{chargefw2_dir}/include']
+    args = ['g++', '-O1', '-c', '-fPIC', f'-isystem{options["eigen_include"]}', 'ccl_method.cpp',
+            f'-I{chargefw2_dir}/include']
 
     p = subprocess.run(args, cwd=tmpdir)
     if p.returncode:
@@ -190,8 +286,38 @@ def evaluate(individual, method_skeleton: 'CCLMethod', functions, data: dict, op
         return (rmsd,)
 
 
-def generate(initial_method: 'CCLMethod', dataset: str, ref_charges: str, parameters: str,
-             user_options: Optional[dict] = None):
+def generate_population(toolbox, functions, options):
+    """Generate initial population"""
+    pop = toolbox.population(n=options['population_size'])
+
+    if options['unique_population']:
+        codes = set()
+        unique_pop = []
+
+        for ind in pop:
+            code = generate_ccl_code(ind, functions)
+            if code not in codes:
+                codes.add(code)
+                unique_pop.append(ind)
+
+        diff = options['population_size'] - len(unique_pop)
+        while diff != 0:
+            new_pop = toolbox.population(n=diff)
+            for ind in new_pop:
+                code = generate_ccl_code(ind, functions)
+                if code not in codes:
+                    codes.add(code)
+                    unique_pop.append(ind)
+
+            diff = options['population_size'] - len(unique_pop)
+
+        pop[:] = unique_pop
+
+    return pop
+
+
+def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charges: str, parameters: str,
+                            user_options: Optional[dict] = None):
     expr = initial_method.get_regression_expr()
     if expr is None:
         raise RuntimeError('No regression expression specified')
@@ -199,6 +325,9 @@ def generate(initial_method: 'CCLMethod', dataset: str, ref_charges: str, parame
     options = {**default_options}
     if user_options is not None:
         options.update(**user_options)
+
+    manager = multiprocessing.Manager()
+    cache = manager.dict()
 
     random.seed(options['seed'])
 
@@ -218,16 +347,27 @@ def generate(initial_method: 'CCLMethod', dataset: str, ref_charges: str, parame
     toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-    toolbox.register('evaluate', evaluate, method_skeleton=initial_method, functions=functions,
+    toolbox.register('evaluate', evaluate, method_skeleton=initial_method, cache=cache, functions=functions,
                      data={'set': dataset, 'ref-charges': ref_charges, 'parameters': parameters}, options=options)
     toolbox.register("select", tools.selTournament, tournsize=5)
     toolbox.register("mate", gp.cxOnePoint)
     toolbox.register("expr_mut", gp.genFull, min_=0, max_=2)
     toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
 
+    stats = tools.Statistics(key=lambda x: x.fitness.values)
+    stats.register("avg", lambda x: np.mean(np.array(x)[np.isfinite(x)]))
+    stats.register("std", lambda x: np.std(np.array(x)[np.isfinite(x)]))
+    stats.register("min", lambda x: np.min(np.array(x)[np.isfinite(x)]))
+    stats.register("max", lambda x: np.max(np.array(x)[np.isfinite(x)]))
+
+    logbook = tools.Logbook()
+
+    hof = tools.HallOfFame(options['top_results'], similar=functools.partial(individual_eq, functions=functions))
+
     # Run GP algorithm
     print('*** Evaluating initial population ***')
-    pop = toolbox.population(n=options['population_size'])
+
+    pop = generate_population(toolbox, functions, options)
 
     if options['parallelization']:
         pool = multiprocessing.Pool(options['ncpus'])
@@ -236,6 +376,10 @@ def generate(initial_method: 'CCLMethod', dataset: str, ref_charges: str, parame
     fitnesses = toolbox.map(toolbox.evaluate, pop)
     for ind, fit in zip(pop, fitnesses):
         ind.fitness.values = fit
+
+    hof.update(pop)
+    record = stats.compile(pop)
+    logbook.record(gen=0, **record)
 
     for gen in range(options['generations']):
         print(f'*** Evaluating generation: {gen + 1} ***')
@@ -260,13 +404,15 @@ def generate(initial_method: 'CCLMethod', dataset: str, ref_charges: str, parame
 
         pop[:] = offspring
 
-    results = {}
-    for individual in pop:
-        results[generate_ccl_code(individual, functions)] = individual
+        hof.update(pop)
+        record = stats.compile(pop)
+        logbook.record(gen=gen + 1, **record)
 
-    best = sorted(results.values(), key=lambda x: x.fitness.values[0])
+    print(f'*** Best individuals encountered ({options["top_results"]}) ***')
+    for i in range(options['top_results']):
+        print(f'RMSD = {hof[i].fitness.values[0]: .3f}: ', generate_optimized_ccl_code(hof[i], functions))
 
-    best_no = min(options["top_results"], len(best))
-    print(f'TOP {best_no}: ')
-    for i in range(best_no):
-        print(f'RMSD = {best[i].fitness.values[0]: .3f}: ', generate_ccl_code(best[i], functions))
+    if options['print_stats']:
+        logbook.header = 'gen', 'min', 'avg', 'std', 'max'
+        print('*** Statistics over generations ***')
+        print(logbook)

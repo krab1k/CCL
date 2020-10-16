@@ -9,7 +9,7 @@ from ccl.parser import process_source
 from ccl.symboltable import SymbolTable
 from ccl.errors import CCLError
 from ccl.complexity import Complexity
-from ccl.regression import generate
+from ccl.regression import run_symbolic_regression
 
 
 class CCLMethod:
@@ -76,4 +76,4 @@ class CCLMethod:
                        regression_options: Optional[dict] = None):
         """Run a symbolic regression for the method to find which expression to use instead of {} placeholder"""
 
-        generate(self, molecules_file, ref_chg_file, parameters_file, regression_options)
+        run_symbolic_regression(self, molecules_file, ref_chg_file, parameters_file, regression_options)
