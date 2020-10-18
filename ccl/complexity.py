@@ -2,10 +2,10 @@
 
 import sympy
 
-from ccl import ast, symboltable
+from ccl import ast, symboltable, types
 
 
-OBJECT_COMPLEXITY = {ast.ObjectType.ATOM: 'N', ast.ObjectType.BOND: 'M'}
+OBJECT_COMPLEXITY = {types.ObjectType.ATOM: 'N', types.ObjectType.BOND: 'M'}
 
 
 class Complexity(ast.ASTVisitor):
@@ -17,7 +17,7 @@ class Complexity(ast.ASTVisitor):
     def visit_Method(self, node: ast.Method) -> str:
         init_complexity = []
         for s in self.symbol_table.symbols.values():
-            if isinstance(s.symbol_type, ast.ArrayType):
+            if isinstance(s.symbol_type, types.ArrayType):
                 init_complexity.append(' * '.join(OBJECT_COMPLEXITY[idx] for idx in s.symbol_type.indices))
 
         statements_complexity = [self.visit(statement) for statement in node.statements]
@@ -44,7 +44,7 @@ class Complexity(ast.ASTVisitor):
         assign = '1'
         if isinstance(node.lhs, ast.Name):
             s = self.symbol_table.resolve(node.lhs.val)
-            if isinstance(s.symbol_type, ast.ArrayType):
+            if isinstance(s.symbol_type, types.ArrayType):
                 assign = ' * '.join(OBJECT_COMPLEXITY[idx] for idx in s.symbol_type.indices)
 
         return f'{assign} + {self.visit(node.rhs)}'
@@ -84,9 +84,9 @@ class Complexity(ast.ASTVisitor):
 
         ltype = node.left.result_type
         rtype = node.right.result_type
-        if isinstance(ltype, ast.NumericType) and isinstance(rtype, ast.NumericType):
+        if isinstance(ltype, types.NumericType) and isinstance(rtype, types.NumericType):
             complexity_parts.append('1')
-        elif isinstance(ltype, ast.ArrayType) and isinstance(rtype, ast.ArrayType):
+        elif isinstance(ltype, types.ArrayType) and isinstance(rtype, types.ArrayType):
             if node.op in {node.Ops.ADD, node.Ops.SUB}:
                 complexity_parts.append(' * '.join(OBJECT_COMPLEXITY[idx] for idx in ltype.indices))
             elif node.op == node.Ops.MUL:
@@ -107,7 +107,7 @@ class Complexity(ast.ASTVisitor):
                     complexity_parts.append(' * '.join(OBJECT_COMPLEXITY[idx] for idx in tmp))
         # Scalar and matrix/vector
         else:
-            if isinstance(ltype, ast.NumericType):
+            if isinstance(ltype, types.NumericType):
                 complexity_parts.append(' * '.join(OBJECT_COMPLEXITY[idx] for idx in rtype.indices))
             else:
                 complexity_parts.append(' * '.join(OBJECT_COMPLEXITY[idx] for idx in ltype.indices))
@@ -145,9 +145,9 @@ class Complexity(ast.ASTVisitor):
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> str:
         complexity_parts = []
-        if isinstance(node.expr.result_type, ast.NumericType):
+        if isinstance(node.expr.result_type, types.NumericType):
             complexity_parts = ['1']
-        elif isinstance(node.expr.result_type, ast.ArrayType):
+        elif isinstance(node.expr.result_type, types.ArrayType):
             complexity_parts.append(' * '.join([OBJECT_COMPLEXITY[idx] for idx in node.expr.result_type.indices]))
         else:
             raise RuntimeError('We should not get here')
