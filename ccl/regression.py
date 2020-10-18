@@ -8,6 +8,7 @@ import tempfile
 import math
 import subprocess
 import shutil
+import operator
 import multiprocessing
 import numpy as np
 from typing import Optional
@@ -25,7 +26,7 @@ default_options = {
     'population_size': 200,
     'crossover_probability': 0.8,
     'mutation_probability': 0.2,
-    'generations': 10,
+    'generations': 15,
     'top_results': 5,
     'unique_population': True,
     'parallelization': True,
@@ -33,7 +34,8 @@ default_options = {
     'seed': None,
     'chargefw2_dir': '/opt/chargefw2',
     'eigen_include': '/usr/include/eigen3',
-    'print_stats': True
+    'print_stats': True,
+    'early_exit': False
 }
 
 
@@ -45,7 +47,7 @@ class BondObject:
     pass
 
 
-def prepare_primitive_set(table: ccl.symboltable.SymbolTable, options: dict) -> Tuple[gp.PrimitiveSetTyped, dict]:
+def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, options: dict) -> Tuple[gp.PrimitiveSetTyped, dict]:
     """Prepare set of primitives from which the individual is built"""
     input_types = []
     object_names = []
@@ -56,6 +58,9 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, options: dict) -> 
     atom_parameters = []
     bond_parameters = []
     common_parameters = []
+
+    simple_variables = []
+    atom_array_variables = []
 
     distance_name = None
 
@@ -82,6 +87,15 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, options: dict) -> 
                 bond_parameters.append(s.name)
             else:
                 common_parameters.append(s.name)
+        elif isinstance(s, ccl.symboltable.VariableSymbol):
+            # Check whether the name was defined on the same line or later and thus cannot be used
+            if s.def_node is not None and s.def_node.line >= expr.line:
+                continue
+            if isinstance(s.type, ccl.types.NumericType):
+                simple_variables.append(s.name)
+            elif isinstance(s.type, ccl.types.ArrayType):
+                if s.type == ccl.types.ArrayType(ccl.types.ObjectType.ATOM, ):
+                    atom_array_variables.append(s.name)
 
     primitive_set = gp.PrimitiveSetTyped('MAIN', input_types, float)
 
@@ -102,6 +116,12 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, options: dict) -> 
     for cp in common_parameters:
         primitive_set.addTerminal(cp, float, cp)
 
+    for v in simple_variables:
+        primitive_set.addTerminal(v, float, v)
+
+    for array_atom in atom_array_variables:
+        primitive_set.addPrimitive(array_atom, [AtomObject], float, array_atom)
+
     if options['use_math_functions']:
         for math_fn in ccl.functions.MATH_FUNCTIONS:
             primitive_set.addPrimitive(math_fn, [float], float, math_fn)
@@ -117,8 +137,8 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, options: dict) -> 
 
     primitive_set.renameArguments(**{f'ARG{i}': name for i, name in enumerate(object_names)})
 
-    functions = {'distance': distance_name, 'atom': atom_properties, 'bond': bond_properties,
-                 'atom_parameters': atom_parameters, 'bond_parameters': bond_parameters}
+    functions = {'distance': distance_name,
+                 'single_argument': atom_properties + bond_properties + atom_parameters + bond_parameters + atom_array_variables}
 
     return primitive_set, functions
 
@@ -144,8 +164,7 @@ def generate_ccl_code(expr, functions):
                 string = f'{args[0]}'
             elif prim.name == distance_name:
                 string = f'{distance_name}[{args[0]}, {args[1]}]'
-            elif prim.name in functions['atom'] or prim.name in functions['bond'] or \
-                    prim.name in functions['atom_parameters'] or prim.name in functions['bond_parameters']:
+            elif prim.name in functions['single_argument']:
                 string = f'{prim.name}[{args[0]}]'
             else:
                 string = prim.format(*args)
@@ -169,12 +188,18 @@ def generate_optimized_ccl_code(expr, functions) -> Optional[str]:
                 try:
                     string = str(decimal.Decimal(args[0]) + decimal.Decimal(args[1]))
                 except decimal.InvalidOperation:
-                    string = f'{args[0]} + {args[1]}'
+                    if args[0] < args[1]:
+                        string = f'{args[0]} + {args[1]}'
+                    else:
+                        string = f'{args[1]} + {args[0]}'
             elif prim.name == 'sub':
-                try:
-                    string = str(decimal.Decimal(args[0]) - decimal.Decimal(args[1]))
-                except decimal.InvalidOperation:
-                    string = f'{args[0]} - {args[1]}'
+                if args[1] == '0.0':
+                    string = args[0]
+                else:
+                    try:
+                        string = str(decimal.Decimal(args[0]) - decimal.Decimal(args[1]))
+                    except decimal.InvalidOperation:
+                        string = f'{args[0]} - {args[1]}'
             elif prim.name == 'mul':
                 if args[0] == '0.0' or args[1] == '0.0':
                     string = '0.0'
@@ -182,8 +207,10 @@ def generate_optimized_ccl_code(expr, functions) -> Optional[str]:
                     string = args[1]
                 elif args[1] == '1.0':
                     string = args[0]
-                else:
+                elif args[0] < args[1]:
                     string = f'({args[0]}) * ({args[1]})'
+                else:
+                    string = f'({args[1]}) * ({args[0]})'
             elif prim.name == 'div':
                 if args[1] == '0.0':
                     return None
@@ -202,8 +229,7 @@ def generate_optimized_ccl_code(expr, functions) -> Optional[str]:
                     string = f'{distance_name}[{args[0]}, {args[1]}]'
                 else:
                     string = f'{distance_name}[{args[1]}, {args[0]}]'
-            elif prim.name in functions['atom'] or prim.name in functions['bond'] or \
-                    prim.name in functions['atom_parameters'] or prim.name in functions['bond_parameters']:
+            elif prim.name in functions['single_argument']:
                 string = f'{prim.name}[{args[0]}]'
             else:
                 string = prim.format(*args)
@@ -220,7 +246,7 @@ def individual_eq(first, second, functions):
 
 
 def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, data: dict, options: dict) -> Tuple[
-        float]:
+    float]:
     """Evaluate individual by calculating RMSD between new and reference charges"""
     new_expr = generate_optimized_ccl_code(individual, functions)
 
@@ -228,15 +254,14 @@ def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, d
         return (math.inf,)
 
     if new_expr in cache:
-        print(f'Cached (RMSD = {cache[new_expr]:.3f}): {new_expr}')
+        print(f'Cached (RMSD = {cache[new_expr]:.4f}): {new_expr}')
         return (cache[new_expr],)
 
     new_source = method_skeleton.source.format(f'({new_expr})')
 
-    new_method = method_skeleton.__class__(new_source)
-
     tmpdir = tempfile.mkdtemp(prefix='ccl_regression_')
     try:
+        new_method = method_skeleton.__class__(new_source)
         new_method.translate('cpp', output_dir=tmpdir)
     except ccl.errors.CCLCodeError as e:
         line = new_source.split('\n')[e.line - 1]
@@ -282,7 +307,7 @@ def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, d
     else:
         rmsd = float(p.stdout.decode('utf-8'))
         cache[new_expr] = rmsd
-        print(f'Evaluated (RMSD = {rmsd:.3f}): {new_expr}')
+        print(f'Evaluated (RMSD = {rmsd:.4f}): {new_expr}')
         return (rmsd,)
 
 
@@ -337,28 +362,32 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     table = ccl.symboltable.SymbolTable.get_table_for_node(expr)
 
     # Setup GP toolbox
-    pset, functions = prepare_primitive_set(table, options)
+    pset, functions = prepare_primitive_set(table, expr, options)
 
-    creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-    creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin)
+    creator.create('FitnessMin', base.Fitness, weights=(-1.0,))
+    creator.create('Individual', gp.PrimitiveTree, fitness=creator.FitnessMin)
 
     toolbox = base.Toolbox()
-    toolbox.register("expr", gp.genGrow, pset=pset, min_=1, max_=5)
-    toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    toolbox.register('expr', gp.genGrow, pset=pset, min_=1, max_=6)
+    toolbox.register('individual', tools.initIterate, creator.Individual, toolbox.expr)
+    toolbox.register('population', tools.initRepeat, list, toolbox.individual)
 
     toolbox.register('evaluate', evaluate, method_skeleton=initial_method, cache=cache, functions=functions,
                      data={'set': dataset, 'ref-charges': ref_charges, 'parameters': parameters}, options=options)
-    toolbox.register("select", tools.selTournament, tournsize=5)
-    toolbox.register("mate", gp.cxOnePoint)
-    toolbox.register("expr_mut", gp.genFull, min_=0, max_=2)
-    toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
+    toolbox.register('select', tools.selDoubleTournament, fitness_size=10, fitness_first=True, parsimony_size=1.4)
+    toolbox.register('mate', gp.cxOnePoint)
+    toolbox.register('expr_mut', gp.genFull, min_=0, max_=3)
+    toolbox.register('mutate', gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
+    toolbox.register('mutate_shrink', gp.mutShrink)
+
+    toolbox.decorate('mate', gp.staticLimit(operator.attrgetter('height'), 17))
+    toolbox.decorate('mutate', gp.staticLimit(operator.attrgetter('height'), 17))
 
     stats = tools.Statistics(key=lambda x: x.fitness.values)
-    stats.register("avg", lambda x: np.mean(np.array(x)[np.isfinite(x)]))
-    stats.register("std", lambda x: np.std(np.array(x)[np.isfinite(x)]))
-    stats.register("min", lambda x: np.min(np.array(x)[np.isfinite(x)]))
-    stats.register("max", lambda x: np.max(np.array(x)[np.isfinite(x)]))
+    stats.register('avg', lambda x: np.mean(np.array(x)[np.isfinite(x)]))
+    stats.register('std', lambda x: np.std(np.array(x)[np.isfinite(x)]))
+    stats.register('min', lambda x: np.min(np.array(x)[np.isfinite(x)]))
+    stats.register('max', lambda x: np.max(np.array(x)[np.isfinite(x)]))
 
     logbook = tools.Logbook()
 
@@ -393,7 +422,10 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
         for mutant in offspring:
             if random.random() < options['mutation_probability']:
-                toolbox.mutate(mutant)
+                if random.random() < 0.3:
+                    toolbox.mutate_shrink(mutant)
+                else:
+                    toolbox.mutate(mutant)
                 del mutant.fitness.values
 
         print('=> Evaluating offspring and mutations')
@@ -408,9 +440,13 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
         record = stats.compile(pop)
         logbook.record(gen=gen + 1, **record)
 
+        if options['early_exit']:
+            if record['min'] == 0.0:
+                break
+
     print(f'*** Best individuals encountered ({options["top_results"]}) ***')
     for i in range(options['top_results']):
-        print(f'RMSD = {hof[i].fitness.values[0]: .3f}: ', generate_optimized_ccl_code(hof[i], functions))
+        print(f'RMSD = {hof[i].fitness.values[0]: .4f}: ', generate_optimized_ccl_code(hof[i], functions))
 
     if options['print_stats']:
         logbook.header = 'gen', 'min', 'avg', 'std', 'max'
