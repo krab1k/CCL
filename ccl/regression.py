@@ -384,8 +384,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     toolbox.decorate('mutate', gp.staticLimit(operator.attrgetter('height'), 17))
 
     stats = tools.Statistics(key=lambda x: x.fitness.values)
-    stats.register('avg', lambda x: np.mean(np.array(x)[np.isfinite(x)]))
-    stats.register('std', lambda x: np.std(np.array(x)[np.isfinite(x)]))
+    stats.register('med', lambda x: np.median(np.array(x)[np.isfinite(x)]))
     stats.register('min', lambda x: np.min(np.array(x)[np.isfinite(x)]))
     stats.register('max', lambda x: np.max(np.array(x)[np.isfinite(x)]))
 
@@ -444,11 +443,12 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
             if record['min'] == 0.0:
                 break
 
-    print(f'*** Best individuals encountered ({options["top_results"]}) ***')
-    for i in range(options['top_results']):
+    best_count = min(len(hof), options['top_results'])
+    print(f'*** Best individuals encountered ({best_count}) ***')
+    for i in range(best_count):
         print(f'RMSD = {hof[i].fitness.values[0]: .4f}: ', generate_optimized_ccl_code(hof[i], functions))
 
     if options['print_stats']:
-        logbook.header = 'gen', 'min', 'avg', 'std', 'max'
+        logbook.header = 'gen', 'min', 'med', 'max'
         print('*** Statistics over generations ***')
         print(logbook)
