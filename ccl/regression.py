@@ -15,6 +15,8 @@ from typing import Optional
 import decimal
 import functools
 
+import chargefw2_python
+
 import ccl.ast
 import ccl.symboltable
 import ccl.types
@@ -245,17 +247,16 @@ def individual_eq(first, second, functions):
     return generate_optimized_ccl_code(first, functions) == generate_optimized_ccl_code(second, functions)
 
 
-def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, data: dict, options: dict) -> Tuple[
-    float]:
+def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, options: dict) -> Tuple[float]:
     """Evaluate individual by calculating RMSD between new and reference charges"""
     new_expr = generate_optimized_ccl_code(individual, functions)
 
     if new_expr is None:
-        return (math.inf,)
+        return math.inf,
 
     if new_expr in cache:
         print(f'Cached (RMSD = {cache[new_expr]:.4f}): {new_expr}')
-        return (cache[new_expr],)
+        return cache[new_expr],
 
     new_source = method_skeleton.source.format(f'({new_expr})')
 
@@ -266,11 +267,11 @@ def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, d
     except ccl.errors.CCLCodeError as e:
         line = new_source.split('\n')[e.line - 1]
         print(f'CCL Compilation Error: {e.line}:{e.column}: {line}: {e.message}', file=sys.stderr)
-        return (math.inf,)
+        return math.inf,
     except Exception as e:
         print(f'Unknown error during compilation: {e}', file=sys.stderr)
         print(new_source)
-        return (math.inf,)
+        return math.inf,
 
     chargefw2_dir = options['chargefw2_dir']
 
@@ -280,7 +281,7 @@ def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, d
     p = subprocess.run(args, cwd=tmpdir)
     if p.returncode:
         print('Cannot compile', file=sys.stderr)
-        return (math.inf,)
+        return math.inf,
 
     args = ['g++', '-fPIC', '-shared', '-Wl,-soname,libREGRESSION.so', '-o', 'libREGRESSION.so',
             'ccl_method.o', f'-L{chargefw2_dir}/lib', f'-Wl,-rpath,{chargefw2_dir}lib:', '-lchargefw2']
@@ -288,27 +289,17 @@ def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, d
     p = subprocess.run(args, cwd=tmpdir)
     if p.returncode:
         print('Cannot link', file=sys.stderr)
-        return (math.inf,)
+        return math.inf,
 
-    args = [f'{chargefw2_dir}/bin/chargefw2', '--mode', 'evaluation', '--method', f'{tmpdir}/libREGRESSION.so',
-            '--ref-chg-file', data['ref-charges'], '--input-file', data['set'],
-            '--chg-out-dir', tmpdir]
-
-    if data['parameters'] is not None:
-        args.extend(['--par-file', data['parameters']])
-
-    p = subprocess.run(args, cwd=tmpdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    global data
+    rmsd = chargefw2_python.evaluate(data, f'{tmpdir}/libREGRESSION.so')
 
     shutil.rmtree(tmpdir)
-    if p.returncode:
-        print(f'Evaluated (RMSD = inf): {new_expr}')
-        cache[new_expr] = math.inf
-        return (math.inf,)
-    else:
-        rmsd = float(p.stdout.decode('utf-8'))
-        cache[new_expr] = rmsd
-        print(f'Evaluated (RMSD = {rmsd:.4f}): {new_expr}')
-        return (rmsd,)
+
+    res = rmsd if rmsd >= 0 else math.inf
+    print(f'Evaluated (RMSD = {res:.4f}): {new_expr}')
+    cache[new_expr] = res
+    return res,
 
 
 def generate_population(toolbox, functions, options):
@@ -339,6 +330,14 @@ def generate_population(toolbox, functions, options):
         pop[:] = unique_pop
 
     return pop
+
+
+data = None
+
+
+def init(dataset, ref_charges, parameters):
+    global data
+    data = chargefw2_python.Data(dataset, ref_charges, parameters)
 
 
 def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charges: str, parameters: str,
@@ -373,7 +372,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     toolbox.register('population', tools.initRepeat, list, toolbox.individual)
 
     toolbox.register('evaluate', evaluate, method_skeleton=initial_method, cache=cache, functions=functions,
-                     data={'set': dataset, 'ref-charges': ref_charges, 'parameters': parameters}, options=options)
+                     options=options)
     toolbox.register('select', tools.selDoubleTournament, fitness_size=10, fitness_first=True, parsimony_size=1.4)
     toolbox.register('mate', gp.cxOnePoint)
     toolbox.register('expr_mut', gp.genFull, min_=0, max_=3)
@@ -398,7 +397,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     pop = generate_population(toolbox, functions, options)
 
     if options['parallelization']:
-        pool = multiprocessing.Pool(options['ncpus'])
+        pool = multiprocessing.Pool(options['ncpus'], initializer=init, initargs=(dataset, ref_charges, parameters))
         toolbox.register('map', pool.map)
 
     fitnesses = toolbox.map(toolbox.evaluate, pop)
