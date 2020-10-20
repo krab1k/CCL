@@ -14,6 +14,8 @@ import numpy as np
 from typing import Optional
 import decimal
 import functools
+import sympy
+import tqdm
 
 import chargefw2_python
 
@@ -31,13 +33,13 @@ default_options = {
     'generations': 15,
     'top_results': 5,
     'unique_population': True,
-    'parallelization': True,
     'ncpus': None,
     'seed': None,
     'chargefw2_dir': '/opt/chargefw2',
     'eigen_include': '/usr/include/eigen3',
     'print_stats': True,
-    'early_exit': False
+    'early_exit': False,
+    'require_symmetry': False
 }
 
 
@@ -49,9 +51,12 @@ class BondObject:
     pass
 
 
-def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, options: dict) -> Tuple[gp.PrimitiveSetTyped, dict]:
+def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, options: dict) -> Tuple[
+    gp.PrimitiveSetTyped, dict]:
     """Prepare set of primitives from which the individual is built"""
     input_types = []
+    atom_names = []
+    bond_names = []
     object_names = []
 
     atom_properties = []
@@ -72,8 +77,10 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
                 continue
             if s.type == ccl.types.ObjectType.ATOM:
                 input_types.append(AtomObject)
+                atom_names.append(s.name)
             else:
                 input_types.append(BondObject)
+                bond_names.append(s.name)
             object_names.append(s.name)
         elif isinstance(s, ccl.symboltable.FunctionSymbol):
             if s.function.name in ccl.functions.ELEMENT_PROPERTIES:
@@ -139,17 +146,35 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
 
     primitive_set.renameArguments(**{f'ARG{i}': name for i, name in enumerate(object_names)})
 
-    functions = {'distance': distance_name,
-                 'single_argument': atom_properties + bond_properties + atom_parameters + bond_parameters + atom_array_variables}
+    if options['require_symmetry']:
+        if len(atom_names) not in (0, 2) or len(bond_names) not in (0, 2):
+            raise RuntimeError('Symmetry requires two variables of the same name')
 
-    return primitive_set, functions
+    ccl_objects = {'distance': distance_name,
+                   'single_argument': atom_properties + bond_properties + atom_parameters + bond_parameters + atom_array_variables,
+                   'atom_objects': atom_names, 'bond_objects': bond_names}
+
+    return primitive_set, ccl_objects
 
 
-def generate_ccl_code(expr, functions):
+def check_symmetry(sympy_expr: sympy.Expr, ccl_objects: dict) -> bool:
+    substitutions = {}
+    for ab_type in ['atom_objects', 'bond_objects']:
+        if ccl_objects[ab_type]:
+            x = ccl_objects[ab_type][0]
+            y = ccl_objects[ab_type][1]
+            substitutions[x] = y
+            substitutions[y] = x
+
+    sympy_expr_swapped = sympy.simplify(sympy_expr.subs(substitutions, simultaneous=True))
+    return sympy_expr == sympy_expr_swapped
+
+
+def generate_sympy_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr:
     """Generates unoptimized version of CCL code from an individual"""
     string = ''
     stack = []
-    distance_name = functions.get('distance', None)
+    distance_name = ccl_objects.get('distance', None)
     for node in expr:
         stack.append((node, []))
         while len(stack[-1][1]) == stack[-1][0].arity:
@@ -165,23 +190,28 @@ def generate_ccl_code(expr, functions):
             elif prim.name == 'atom':
                 string = f'{args[0]}'
             elif prim.name == distance_name:
-                string = f'{distance_name}[{args[0]}, {args[1]}]'
-            elif prim.name in functions['single_argument']:
-                string = f'{prim.name}[{args[0]}]'
+                if args[0] == args[1]:
+                    string = '0'
+                elif args[0] < args[1]:
+                    string = f'{distance_name}({args[0]}{args[1]})'
+                else:
+                    string = f'{distance_name}({args[1]}{args[0]})'
+            elif prim.name in ccl_objects['single_argument']:
+                string = f'{prim.name}({args[0]})'
             else:
                 string = prim.format(*args)
             if len(stack) == 0:
                 break  # If stack is empty, all nodes should have been seen
             stack[-1][1].append(string)
 
-    return string
+    return sympy.simplify(sympy.sympify(string))
 
 
-def generate_optimized_ccl_code(expr, functions) -> Optional[str]:
+def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> str:
     """Generates somewhat optimized CCL code for an individual"""
     string = ''
     stack = []
-    distance_name = functions.get('distance', None)
+    distance_name = ccl_objects.get('distance', None)
     for node in expr:
         stack.append((node, []))
         while len(stack[-1][1]) == stack[-1][0].arity:
@@ -214,8 +244,6 @@ def generate_optimized_ccl_code(expr, functions) -> Optional[str]:
                 else:
                     string = f'({args[1]}) * ({args[0]})'
             elif prim.name == 'div':
-                if args[1] == '0.0':
-                    return None
                 if args[0] == args[1]:
                     string = '1.0'
                 elif args[1] == '1.0':
@@ -231,7 +259,7 @@ def generate_optimized_ccl_code(expr, functions) -> Optional[str]:
                     string = f'{distance_name}[{args[0]}, {args[1]}]'
                 else:
                     string = f'{distance_name}[{args[1]}, {args[0]}]'
-            elif prim.name in functions['single_argument']:
+            elif prim.name in ccl_objects['single_argument']:
                 string = f'{prim.name}[{args[0]}]'
             else:
                 string = prim.format(*args)
@@ -242,22 +270,22 @@ def generate_optimized_ccl_code(expr, functions) -> Optional[str]:
     return string
 
 
-def individual_eq(first, second, functions):
+def individual_eq(first: gp.PrimitiveTree, second: gp.PrimitiveTree, ccl_objects: dict) -> bool:
     """Test whether the two individuals would have a same CCL code representation"""
-    return generate_optimized_ccl_code(first, functions) == generate_optimized_ccl_code(second, functions)
+    return generate_sympy_code(first, ccl_objects) == generate_sympy_code(second, ccl_objects)
 
 
-def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, options: dict) -> Tuple[float]:
+def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: dict, ccl_objects: dict, options: dict,
+             message_queue: multiprocessing.Queue) -> Tuple[float]:
     """Evaluate individual by calculating RMSD between new and reference charges"""
-    new_expr = generate_optimized_ccl_code(individual, functions)
+    sympy_expr = generate_sympy_code(individual, ccl_objects)
 
-    if new_expr is None:
-        return math.inf,
+    sympy_expr_evaluated = str(sympy_expr.evalf(2))
+    if sympy_expr_evaluated in cache:
+        message_queue.put(('Cached', sympy_expr_evaluated, cache[sympy_expr_evaluated]))
+        return cache[sympy_expr_evaluated],
 
-    if new_expr in cache:
-        print(f'Cached (RMSD = {cache[new_expr]:.4f}): {new_expr}')
-        return cache[new_expr],
-
+    new_expr = generate_optimized_ccl_code(individual, ccl_objects)
     new_source = method_skeleton.source.format(f'({new_expr})')
 
     tmpdir = tempfile.mkdtemp(prefix='ccl_regression_')
@@ -275,20 +303,13 @@ def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, o
 
     chargefw2_dir = options['chargefw2_dir']
 
-    args = ['g++', '-O1', '-c', '-fPIC', f'-isystem{options["eigen_include"]}', 'ccl_method.cpp',
-            f'-I{chargefw2_dir}/include']
+    args = ['g++', '-O1', '-s', '-fPIC', f'-isystem{options["eigen_include"]}', f'-I{chargefw2_dir}/include', '-shared',
+            '-Wl,-soname,libREGRESSION.so', f'-L{chargefw2_dir}/lib', f'-Wl,-rpath,{chargefw2_dir}lib:',
+            '-o', 'libREGRESSION.so', 'ccl_method.cpp', '-lchargefw2']
 
     p = subprocess.run(args, cwd=tmpdir)
     if p.returncode:
-        print('Cannot compile', file=sys.stderr)
-        return math.inf,
-
-    args = ['g++', '-fPIC', '-shared', '-Wl,-soname,libREGRESSION.so', '-o', 'libREGRESSION.so',
-            'ccl_method.o', f'-L{chargefw2_dir}/lib', f'-Wl,-rpath,{chargefw2_dir}lib:', '-lchargefw2']
-
-    p = subprocess.run(args, cwd=tmpdir)
-    if p.returncode:
-        print('Cannot link', file=sys.stderr)
+        print(f'Cannot compile: {new_expr}', file=sys.stderr)
         return math.inf,
 
     global data
@@ -297,45 +318,65 @@ def evaluate(individual, method_skeleton: 'CCLMethod', cache: dict, functions, o
     shutil.rmtree(tmpdir)
 
     res = rmsd if rmsd >= 0 else math.inf
-    print(f'Evaluated (RMSD = {res:.4f}): {new_expr}')
-    cache[new_expr] = res
+    message_queue.put(('Evaluated', sympy_expr_evaluated, res))
+    cache[str(sympy_expr)] = res
     return res,
 
 
-def generate_population(toolbox, functions, options):
+def progress_bar(q: multiprocessing.Queue, generations: int) -> None:
+    gen_bar = tqdm.tqdm(total=generations, position=0, desc='Generations')
+    p_bar = tqdm.tqdm(total=0, position=1, desc='Progress inside generation')
+    best_bar = tqdm.tqdm(total=0, position=2, bar_format='{desc}')
+
+    best_rmsd = math.inf
+    for message in iter(q.get, None):
+        if message[0] == 'gen':
+            gen_bar.set_description(f'Generation: {message[1]}')
+            gen_bar.update()
+            p_bar.reset(total=message[2])
+        else:
+            kind, expr, rmsd = message
+            p_bar.write(f'{kind} (RMSD = {rmsd:.4f}): {expr}')
+            p_bar.update()
+
+            if rmsd < best_rmsd:
+                best_rmsd = rmsd
+                best_individual = expr
+                best_bar.set_description_str(f'Best so far: RMSD = {best_rmsd:.4f}: {best_individual}')
+
+    gen_bar.close()
+    p_bar.close()
+    best_bar.close()
+
+
+def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict):
     """Generate initial population"""
-    pop = toolbox.population(n=options['population_size'])
 
-    if options['unique_population']:
-        codes = set()
-        unique_pop = []
+    pop = []
+    codes = set()
+    pbar = tqdm.tqdm(total=options['population_size'])
+    while len(pop) < options['population_size']:
+        ind = toolbox.individual()
+        sympy_code = generate_sympy_code(ind, ccl_objects)
+        if options['require_symmetry']:
+            if not check_symmetry(sympy_code, ccl_objects):
+                continue
+        if options['unique_population']:
+            if sympy_code in codes:
+                continue
+            codes.add(sympy_code)
 
-        for ind in pop:
-            code = generate_ccl_code(ind, functions)
-            if code not in codes:
-                codes.add(code)
-                unique_pop.append(ind)
+        pop.append(ind)
+        pbar.update()
 
-        diff = options['population_size'] - len(unique_pop)
-        while diff != 0:
-            new_pop = toolbox.population(n=diff)
-            for ind in new_pop:
-                code = generate_ccl_code(ind, functions)
-                if code not in codes:
-                    codes.add(code)
-                    unique_pop.append(ind)
-
-            diff = options['population_size'] - len(unique_pop)
-
-        pop[:] = unique_pop
-
+    pbar.close()
     return pop
 
 
 data = None
 
 
-def init(dataset, ref_charges, parameters):
+def init(dataset: str, ref_charges: str, parameters: str) -> None:
     global data
     data = chargefw2_python.Data(dataset, ref_charges, parameters)
 
@@ -352,6 +393,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     manager = multiprocessing.Manager()
     cache = manager.dict()
+    q = manager.Queue()
 
     random.seed(options['seed'])
 
@@ -361,7 +403,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     table = ccl.symboltable.SymbolTable.get_table_for_node(expr)
 
     # Setup GP toolbox
-    pset, functions = prepare_primitive_set(table, expr, options)
+    pset, ccl_objects = prepare_primitive_set(table, expr, options)
 
     creator.create('FitnessMin', base.Fitness, weights=(-1.0,))
     creator.create('Individual', gp.PrimitiveTree, fitness=creator.FitnessMin)
@@ -371,8 +413,8 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     toolbox.register('individual', tools.initIterate, creator.Individual, toolbox.expr)
     toolbox.register('population', tools.initRepeat, list, toolbox.individual)
 
-    toolbox.register('evaluate', evaluate, method_skeleton=initial_method, cache=cache, functions=functions,
-                     options=options)
+    toolbox.register('evaluate', evaluate, method_skeleton=initial_method, cache=cache, ccl_objects=ccl_objects,
+                     options=options, message_queue=q)
     toolbox.register('select', tools.selDoubleTournament, fitness_size=10, fitness_first=True, parsimony_size=1.4)
     toolbox.register('mate', gp.cxOnePoint)
     toolbox.register('expr_mut', gp.genFull, min_=0, max_=3)
@@ -389,17 +431,21 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     logbook = tools.Logbook()
 
-    hof = tools.HallOfFame(options['top_results'], similar=functools.partial(individual_eq, functions=functions))
+    hof = tools.HallOfFame(options['top_results'], similar=functools.partial(individual_eq, ccl_objects=ccl_objects))
 
     # Run GP algorithm
-    print('*** Evaluating initial population ***')
+    print('*** Generating initial population ***')
 
-    pop = generate_population(toolbox, functions, options)
+    pop = generate_population(toolbox, ccl_objects, options)
 
-    if options['parallelization']:
-        pool = multiprocessing.Pool(options['ncpus'], initializer=init, initargs=(dataset, ref_charges, parameters))
-        toolbox.register('map', pool.map)
+    pool = multiprocessing.Pool(options['ncpus'], initializer=init, initargs=(dataset, ref_charges, parameters))
+    toolbox.register('map', pool.map)
 
+    progress_process = multiprocessing.Process(target=progress_bar, args=(q, options['generations'] + 1))
+
+    q.put(('gen', 0, len(pop)))
+
+    progress_process.start()
     fitnesses = toolbox.map(toolbox.evaluate, pop)
     for ind, fit in zip(pop, fitnesses):
         ind.fitness.values = fit
@@ -409,7 +455,6 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     logbook.record(gen=0, **record)
 
     for gen in range(options['generations']):
-        print(f'*** Evaluating generation: {gen + 1} ***')
         offspring = toolbox.select(pop, len(pop))
         offspring = list(toolbox.map(toolbox.clone, offspring))
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
@@ -426,8 +471,9 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
                     toolbox.mutate(mutant)
                 del mutant.fitness.values
 
-        print('=> Evaluating offspring and mutations')
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+        q.put(('gen', gen + 1, len(invalid_ind)))
+
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
@@ -439,13 +485,16 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
         logbook.record(gen=gen + 1, **record)
 
         if options['early_exit']:
-            if record['min'] == 0.0:
+            if record['min'] < 1e-4:
                 break
+
+    q.put(None)
+    progress_process.join()
 
     best_count = min(len(hof), options['top_results'])
     print(f'*** Best individuals encountered ({best_count}) ***')
     for i in range(best_count):
-        print(f'RMSD = {hof[i].fitness.values[0]: .4f}: ', generate_optimized_ccl_code(hof[i], functions))
+        print(f'RMSD = {hof[i].fitness.values[0]: .4f}: ', generate_sympy_code(hof[i], ccl_objects).evalf(2))
 
     if options['print_stats']:
         logbook.header = 'gen', 'min', 'med', 'max'
