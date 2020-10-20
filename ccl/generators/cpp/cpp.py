@@ -90,12 +90,10 @@ Eigen::VectorXd {method_name}::_EE_{number}({args}) const {{
 }}
 '''
 
-
 functions = {
     'electronegativity': 'electronegativity',
     'covalent radius': 'covalent_radius',
     'van der waals radius': 'vdw_radius',
-    'hardness': 'hardness',
     'ionization potential': 'ionization_potential',
     'electron affinity': 'electron_affinity',
     'atomic number': 'Z',
@@ -104,6 +102,13 @@ functions = {
     'bond order': 'order',
     'distance': 'distance'
 }
+
+types = {
+            NumericType.INT: 'int',
+            NumericType.FLOAT: 'double',
+            ObjectType.ATOM: 'const Atom &',
+            ObjectType.BOND: 'const Bond &',
+        }
 
 
 class Cpp(ast.ASTVisitor):
@@ -122,6 +127,7 @@ class Cpp(ast.ASTVisitor):
         self.prototypes: List[str] = []
         self.sum_count: int = 0
         self.ee_count: int = 0
+        self.ee_lambda_defs: List[str] = []
 
         self.required_features: Set[str] = set()
 
@@ -302,11 +308,14 @@ class Cpp(ast.ASTVisitor):
 
             self.var_definitions[symbol.name] = definition
 
+        ee_lambda_defs_str = '\n'.join(self.ee_lambda_defs)
+        self.ee_lambda_defs.clear()
+
         if isinstance(node.lhs, ast.Name) and isinstance(symbol.symbol_type, ArrayType) and \
                 isinstance(node.rhs.result_type, NumericType):
-            return f'{lhs}.fill({rhs});'
+            return f'{ee_lambda_defs_str}\n{lhs}.fill({rhs});'
         else:
-            return f'{lhs} = {rhs};'
+            return f'{ee_lambda_defs_str}\n{lhs} = {rhs};'
 
     def visit_For(self, node: ast.For) -> str:
         code = []
@@ -454,13 +463,6 @@ class Cpp(ast.ASTVisitor):
         else:
             code = f's += {expr_str};'
 
-        types = {
-            NumericType.INT: 'int',
-            NumericType.FLOAT: 'double',
-            ObjectType.ATOM: 'const Atom &',
-            ObjectType.BOND: 'const Bond &',
-        }
-
         formal_args = ['const Molecule &molecule']
         args = ['molecule']
 
@@ -534,7 +536,40 @@ class Cpp(ast.ASTVisitor):
         diag_expr = self.visit(node.diag)
         rhs_expr = self.visit(node.rhs)
 
-        formal_args_str = 'const std::vector<const Atom *> &atoms, double total_charge'
+        used_names: Set[str] = set()
+        used_names |= symboltable.NameGetter().visit(node.off, self.symbol_table)
+        used_names |= symboltable.NameGetter().visit(node.diag, self.symbol_table)
+        used_names |= symboltable.NameGetter().visit(node.rhs, self.symbol_table)
+
+        used_names -= {node.idx_row, node.idx_col}
+
+        formal_args = ['const std::vector<const Atom *> &atoms', 'double total_charge']
+        args = ['atoms, total_charge']
+        captures = ['this']
+
+        for name in used_names:
+            s = self.symbol_table.parent.resolve(name)
+            if s is None:
+                local_symbol = symboltable.SymbolTable.get_table_for_node(node).resolve(name)
+                assert local_symbol is not None
+                assert isinstance(local_symbol.symbol_type, (ArrayType, NumericType, ObjectType))
+                if isinstance(local_symbol.symbol_type, ArrayType):
+                    type_str = 'const Eigen::MatrixXd &'
+                else:
+                    type_str = types[local_symbol.symbol_type]
+
+                formal_args.append(f'{type_str} _{name}')
+                args.append(f'_{name}')
+                captures.append(f'&_{name}')
+
+        if 'q' in used_names:
+            formal_args.append('const Eigen::VectorXd &_q')
+            args.append('_q')
+            captures.append('&_q')
+
+        formal_args_str = ', '.join(formal_args)
+        args_str = ', '.join(args)
+        captures_str = ', '.join(captures)
 
         self.defs.append(ee_template.format(method_name=self.method_name,
                                             number=number,
@@ -547,7 +582,13 @@ class Cpp(ast.ASTVisitor):
 
         self.prototypes.append(ee_prototype.format(number=number,
                                                    args=formal_args_str))
-        return f'solve_EE(molecule, std::bind(&{self.method_name}::_EE_{number}, this, _1, _2))'
+        lambda_def = f'auto _f{number} = ' \
+                     f'[{captures_str}](const std::vector<const Atom *> &atoms, double total_charge) -> Eigen::VectorXd ' \
+                     f'{{ return _EE_{number}({args_str}); }};'
+
+        self.ee_lambda_defs.append(lambda_def)
+
+        return f'solve_EE(molecule, _f{number})'
 
     def visit_Function(self, node: ast.Function) -> str:
         arg = self.visit(node.arg)

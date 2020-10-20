@@ -9,8 +9,6 @@
 
 CHARGEFW2_METHOD({method_name})
 
-using namespace std::placeholders;
-
 {defs}
 
 std::vector<double> {method_name}::calculate_charges(const Molecule &molecule) const {{
