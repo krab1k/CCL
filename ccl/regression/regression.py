@@ -25,6 +25,8 @@ import ccl.types
 import ccl.functions
 import ccl.errors
 
+import ccl.regression.deap_gp
+
 default_options = {
     'use_math_functions': False,
     'population_size': 200,
@@ -51,7 +53,7 @@ class BondObject:
     pass
 
 
-def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, options: dict) -> Tuple[
+def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, rng: random.Random, options: dict) -> Tuple[
     gp.PrimitiveSetTyped, dict]:
     """Prepare set of primitives from which the individual is built"""
     input_types = []
@@ -108,7 +110,7 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
 
     primitive_set = gp.PrimitiveSetTyped('MAIN', input_types, float)
 
-    primitive_set.addEphemeralConstant('rand', lambda: round(random.random() * 5, 1), float)
+    primitive_set.addEphemeralConstant('rand', lambda: round(rng.random() * 2, 1), float)
     primitive_set.addPrimitive('add', [float, float], float, 'add')
     primitive_set.addPrimitive('sub', [float, float], float, 'sub')
     primitive_set.addPrimitive('mul', [float, float], float, 'mul')
@@ -281,6 +283,11 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
     sympy_expr = generate_sympy_code(individual, ccl_objects)
 
     sympy_expr_evaluated = str(sympy_expr.evalf(2))
+
+    if sympy_expr.has(sympy.zoo):
+        message_queue.put(('Invalid', sympy_expr_evaluated, math.inf))
+        return math.inf,
+
     if sympy_expr_evaluated in cache:
         message_queue.put(('Cached', sympy_expr_evaluated, cache[sympy_expr_evaluated]))
         return cache[sympy_expr_evaluated],
@@ -307,7 +314,11 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
             '-Wl,-soname,libREGRESSION.so', f'-L{chargefw2_dir}/lib', f'-Wl,-rpath,{chargefw2_dir}lib:',
             '-o', 'libREGRESSION.so', 'ccl_method.cpp', '-lchargefw2']
 
-    p = subprocess.run(args, cwd=tmpdir)
+    p = subprocess.run(args, cwd=tmpdir, stderr=subprocess.PIPE)
+    if p.stderr:
+        print(f'Warning issued: {new_expr}', file=sys.stderr)
+        print(p.stderr.decode('utf-8'))
+        return math.inf,
     if p.returncode:
         print(f'Cannot compile: {new_expr}', file=sys.stderr)
         return math.inf,
@@ -329,6 +340,7 @@ def progress_bar(q: multiprocessing.Queue, generations: int) -> None:
     best_bar = tqdm.tqdm(total=0, position=2, bar_format='{desc}')
 
     best_rmsd = math.inf
+    i = 1
     for message in iter(q.get, None):
         if message[0] == 'gen':
             gen_bar.set_description(f'Generation: {message[1]}')
@@ -336,9 +348,9 @@ def progress_bar(q: multiprocessing.Queue, generations: int) -> None:
             p_bar.reset(total=message[2])
         else:
             kind, expr, rmsd = message
-            p_bar.write(f'{kind} (RMSD = {rmsd:.4f}): {expr}')
+            p_bar.write(f'[{i:>6}] {kind:>9} (RMSD = {rmsd:.4f}): {expr}')
             p_bar.update()
-
+            i += 1
             if rmsd < best_rmsd:
                 best_rmsd = rmsd
                 best_individual = expr
@@ -357,7 +369,7 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
     pbar = tqdm.tqdm(total=options['population_size'])
     while len(pop) < options['population_size']:
         ind = toolbox.individual()
-        sympy_code = generate_sympy_code(ind, ccl_objects)
+        sympy_code = generate_sympy_code(ind, ccl_objects).evalf(2)
         if options['require_symmetry']:
             if not check_symmetry(sympy_code, ccl_objects):
                 continue
@@ -394,32 +406,28 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     manager = multiprocessing.Manager()
     cache = manager.dict()
     q = manager.Queue()
-
-    random.seed(options['seed'])
-
-    # if method_template.has_parameters():
-    #    raise RuntimeError('Cannot use parameter right now')
+    rng = random.Random(options['seed'])
 
     table = ccl.symboltable.SymbolTable.get_table_for_node(expr)
 
     # Setup GP toolbox
-    pset, ccl_objects = prepare_primitive_set(table, expr, options)
+    pset, ccl_objects = prepare_primitive_set(table, expr, rng, options)
 
     creator.create('FitnessMin', base.Fitness, weights=(-1.0,))
     creator.create('Individual', gp.PrimitiveTree, fitness=creator.FitnessMin)
 
     toolbox = base.Toolbox()
-    toolbox.register('expr', gp.genGrow, pset=pset, min_=1, max_=6)
+    toolbox.register('expr', ccl.regression.deap_gp.gen_half_and_half, pset=pset, min_=1, max_=6, rng=rng)
     toolbox.register('individual', tools.initIterate, creator.Individual, toolbox.expr)
     toolbox.register('population', tools.initRepeat, list, toolbox.individual)
 
     toolbox.register('evaluate', evaluate, method_skeleton=initial_method, cache=cache, ccl_objects=ccl_objects,
                      options=options, message_queue=q)
-    toolbox.register('select', tools.selDoubleTournament, fitness_size=10, fitness_first=True, parsimony_size=1.4)
-    toolbox.register('mate', gp.cxOnePoint)
-    toolbox.register('expr_mut', gp.genFull, min_=0, max_=3)
-    toolbox.register('mutate', gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
-    toolbox.register('mutate_shrink', gp.mutShrink)
+    toolbox.register('select', ccl.regression.deap_gp.sel_double_tournament, fitness_size=10, parsimony_size=1.4, rng=rng)
+    toolbox.register('mate', ccl.regression.deap_gp.cx_one_point, rng=rng)
+    toolbox.register('expr_mut', ccl.regression.deap_gp.gen_full, min_=0, max_=3, rng=rng)
+    toolbox.register('mutate', ccl.regression.deap_gp.mut_uniform, expr=toolbox.expr_mut, pset=pset, rng=rng)
+    toolbox.register('mutate_shrink', ccl.regression.deap_gp.mut_shrink, rng=rng)
 
     toolbox.decorate('mate', gp.staticLimit(operator.attrgetter('height'), 17))
     toolbox.decorate('mutate', gp.staticLimit(operator.attrgetter('height'), 17))
@@ -452,20 +460,20 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     hof.update(pop)
     record = stats.compile(pop)
-    logbook.record(gen=0, **record)
+    logbook.record(gen=0, **record, best=generate_sympy_code(hof[0], ccl_objects).evalf(2))
 
     for gen in range(options['generations']):
         offspring = toolbox.select(pop, len(pop))
         offspring = list(toolbox.map(toolbox.clone, offspring))
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
-            if random.random() < options['crossover_probability']:
+            if rng.random() < options['crossover_probability']:
                 toolbox.mate(child1, child2)
                 del child1.fitness.values
                 del child2.fitness.values
 
         for mutant in offspring:
-            if random.random() < options['mutation_probability']:
-                if random.random() < 0.3:
+            if rng.random() < options['mutation_probability']:
+                if rng.random() < 0.3:
                     toolbox.mutate_shrink(mutant)
                 else:
                     toolbox.mutate(mutant)
@@ -482,7 +490,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
         hof.update(pop)
         record = stats.compile(pop)
-        logbook.record(gen=gen + 1, **record)
+        logbook.record(gen=gen + 1, **record, best=generate_sympy_code(hof[0], ccl_objects).evalf(2))
 
         if options['early_exit']:
             if record['min'] < 1e-4:
@@ -490,6 +498,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     q.put(None)
     progress_process.join()
+    pool.close()
 
     best_count = min(len(hof), options['top_results'])
     print(f'*** Best individuals encountered ({best_count}) ***')
@@ -497,6 +506,6 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
         print(f'RMSD = {hof[i].fitness.values[0]: .4f}: ', generate_sympy_code(hof[i], ccl_objects).evalf(2))
 
     if options['print_stats']:
-        logbook.header = 'gen', 'min', 'med', 'max'
+        logbook.header = 'gen', 'min', 'med', 'max', 'best'
         print('*** Statistics over generations ***')
         print(logbook)
