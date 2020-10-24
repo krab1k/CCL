@@ -16,6 +16,7 @@ import decimal
 import functools
 import sympy
 import tqdm
+from typing import List
 
 import chargefw2_python
 
@@ -41,7 +42,9 @@ default_options = {
     'eigen_include': '/usr/include/eigen3',
     'print_stats': True,
     'early_exit': False,
-    'require_symmetry': False
+    'require_symmetry': False,
+    'initial_seed': [],
+    'initial_seed_mutations': 10
 }
 
 
@@ -361,7 +364,7 @@ def progress_bar(q: multiprocessing.Queue, generations: int) -> None:
     best_bar.close()
 
 
-def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict):
+def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict) -> List[gp.PrimitiveTree]:
     """Generate initial population"""
 
     pop = []
@@ -382,6 +385,34 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
         pbar.update()
 
     pbar.close()
+    return pop
+
+
+def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: dict, primitive_set: gp.PrimitiveSetTyped) -> List[gp.PrimitiveTree]:
+    pop = []
+    codes = set()
+    for no, ind in enumerate(options['initial_seed']):
+        x = creator.Individual(gp.PrimitiveTree.from_string(ind, primitive_set))
+        sympy_code = generate_sympy_code(x, ccl_objects).evalf(2)
+        print(f'[Seed {no:2d} No mutation]: {sympy_code}')
+        pop.append(x)
+        i = 0
+        codes.add(sympy_code)
+        while i < options['initial_seed_mutations']:
+            y = toolbox.clone(x)
+            toolbox.mutate(y)
+            mut_sympy_code = generate_sympy_code(y, ccl_objects).evalf(2)
+            if mut_sympy_code in codes:
+                continue
+
+            if options['require_symmetry']:
+                if not check_symmetry(mut_sympy_code, ccl_objects):
+                    continue
+
+            codes.add(mut_sympy_code)
+            i += 1
+            print(f'[Seed {no:2d} Mutation {i:2d}]: {mut_sympy_code}')
+            pop.append(y)
     return pop
 
 
@@ -445,6 +476,10 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     print('*** Generating initial population ***')
 
     pop = generate_population(toolbox, ccl_objects, options)
+
+    if options['initial_seed']:
+        print('*** Seeding initial population ***')
+        pop.extend(add_seeded_individuals(toolbox, options, ccl_objects, pset))
 
     pool = multiprocessing.Pool(options['ncpus'], initializer=init, initargs=(dataset, ref_charges, parameters))
     toolbox.register('map', pool.map)
