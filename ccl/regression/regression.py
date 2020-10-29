@@ -372,7 +372,12 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
     pbar = tqdm.tqdm(total=options['population_size'])
     while len(pop) < options['population_size']:
         ind = toolbox.individual()
-        sympy_code = generate_sympy_code(ind, ccl_objects).evalf(2)
+        try:
+            sympy_code = generate_sympy_code(ind, ccl_objects).evalf(2)
+            if sympy_code.has(sympy.zoo):
+                continue
+        except OverflowError:
+            continue
         if options['require_symmetry']:
             if not check_symmetry(sympy_code, ccl_objects):
                 continue
@@ -402,6 +407,8 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
             y = toolbox.clone(x)
             toolbox.mutate(y)
             mut_sympy_code = generate_sympy_code(y, ccl_objects).evalf(2)
+            if mut_sympy_code.has(sympy.zoo):
+                continue
             if mut_sympy_code in codes:
                 continue
 
