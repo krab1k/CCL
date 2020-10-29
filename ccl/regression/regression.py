@@ -44,7 +44,8 @@ default_options = {
     'early_exit': False,
     'require_symmetry': False,
     'initial_seed': [],
-    'initial_seed_mutations': 10
+    'initial_seed_mutations': 10,
+    'metric': 'RMSD'
 }
 
 
@@ -305,14 +306,16 @@ def individual_eq(first: gp.PrimitiveTree, second: gp.PrimitiveTree, ccl_objects
 
 def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: dict, ccl_objects: dict, options: dict,
              message_queue: multiprocessing.Queue) -> Tuple[float]:
-    """Evaluate individual by calculating RMSD between new and reference charges"""
+    """Evaluate individual by calculating RMSD or R2 between new and reference charges"""
     sympy_expr = generate_sympy_code(individual, ccl_objects)
 
     sympy_expr_evaluated = str(sympy_expr.evalf(2))
 
+    inf = math.inf if options['metric'] == 'RMSD' else -math.inf
+
     if sympy_expr.has(sympy.zoo):
-        message_queue.put(('Invalid', sympy_expr_evaluated, math.inf))
-        return math.inf,
+        message_queue.put(('Invalid', sympy_expr_evaluated, inf))
+        return inf,
 
     if sympy_expr_evaluated in cache:
         message_queue.put(('Cached', sympy_expr_evaluated, cache[sympy_expr_evaluated]))
@@ -328,11 +331,11 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
     except ccl.errors.CCLCodeError as e:
         line = new_source.split('\n')[e.line - 1]
         print(f'CCL Compilation Error: {e.line}:{e.column}: {line}: {e.message}', file=sys.stderr)
-        return math.inf,
+        return inf,
     except Exception as e:
         print(f'Unknown error during compilation: {e}', file=sys.stderr)
         print(new_source)
-        return math.inf,
+        return inf,
 
     chargefw2_dir = options['chargefw2_dir']
 
@@ -344,28 +347,37 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
     if p.stderr:
         print(f'Warning issued: {new_expr}', file=sys.stderr)
         print(p.stderr.decode('utf-8'))
-        return math.inf,
+        return inf,
     if p.returncode:
         print(f'Cannot compile: {new_expr}', file=sys.stderr)
-        return math.inf,
+        return inf,
 
     global data
-    rmsd = chargefw2_python.evaluate(data, f'{tmpdir}/libREGRESSION.so')
+    rmsd, r2 = chargefw2_python.evaluate(data, f'{tmpdir}/libREGRESSION.so')
 
     shutil.rmtree(tmpdir)
 
-    res = rmsd if rmsd >= 0 else math.inf
+    if options['metric'] == 'RMSD':
+        res = rmsd if rmsd >= 0 else inf
+    else:
+        res = r2 if r2 >= 0 else inf
+
     message_queue.put(('Evaluated', sympy_expr_evaluated, res))
     cache[str(sympy_expr)] = res
     return res,
 
 
-def progress_bar(q: multiprocessing.Queue, generations: int) -> None:
-    gen_bar = tqdm.tqdm(total=generations, position=0, desc='Generations')
+def progress_bar(q: multiprocessing.Queue, options: dict) -> None:
+    gen_bar = tqdm.tqdm(total=options['generations'] + 1, position=0, desc='Generations')
     p_bar = tqdm.tqdm(total=0, position=1, desc='Progress inside generation')
     best_bar = tqdm.tqdm(total=0, position=2, bar_format='{desc}')
 
-    best_rmsd = math.inf
+    metric = options['metric']
+    if metric == 'RMSD':
+        best_res = math.inf
+    else:
+        best_res = -math.inf
+
     i = 1
     for message in iter(q.get, None):
         if message[0] == 'gen':
@@ -373,14 +385,14 @@ def progress_bar(q: multiprocessing.Queue, generations: int) -> None:
             gen_bar.update()
             p_bar.reset(total=message[2])
         else:
-            kind, expr, rmsd = message
-            p_bar.write(f'[{i:>6}] {kind:>9} (RMSD = {rmsd:.4f}): {expr}')
+            kind, expr, res = message
+            p_bar.write(f'[{i:>6}] {kind:>9} ({metric} = {res:.4f}): {expr}')
             p_bar.update()
             i += 1
-            if rmsd < best_rmsd:
-                best_rmsd = rmsd
+            if (metric == 'RMSD' and res < best_res) or (metric == 'R2' and res > best_res):
+                best_res = res
                 best_individual = expr
-                best_bar.set_description_str(f'Best so far: RMSD = {best_rmsd:.4f}: {best_individual}')
+                best_bar.set_description_str(f'Best so far: {metric} = {best_res:.4f}: {best_individual}')
 
     gen_bar.close()
     p_bar.close()
@@ -474,7 +486,11 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     # Setup GP toolbox
     pset, ccl_objects = prepare_primitive_set(table, expr, rng, options)
 
-    creator.create('FitnessMin', base.Fitness, weights=(-1.0,))
+    if options['metric'] == 'RMSD':
+        creator.create('FitnessMin', base.Fitness, weights=(-1.0,))
+    else:
+        creator.create('FitnessMin', base.Fitness, weights=(1.0,))
+
     creator.create('Individual', gp.PrimitiveTree, fitness=creator.FitnessMin)
 
     toolbox = base.Toolbox()
@@ -514,7 +530,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     pool = multiprocessing.Pool(options['ncpus'], initializer=init, initargs=(dataset, ref_charges, parameters))
     toolbox.register('map', pool.map)
 
-    progress_process = multiprocessing.Process(target=progress_bar, args=(q, options['generations'] + 1))
+    progress_process = multiprocessing.Process(target=progress_bar, args=(q, options))
 
     q.put(('gen', 0, len(pop)))
 
@@ -528,6 +544,11 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     logbook.record(gen=0, **record, best=generate_sympy_code(hof[0], ccl_objects).evalf(2))
 
     for gen in range(options['generations']):
+        if options['early_exit']:
+            if (options['metric'] == 'RMSD' and record['min'] < 1e-4) or \
+                    options['metric'] == 'R2' and record['max'] > 1 - 1e-4:
+                break
+
         offspring = toolbox.select(pop, len(pop))
         offspring = list(toolbox.map(toolbox.clone, offspring))
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
@@ -557,10 +578,6 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
         record = stats.compile(pop)
         logbook.record(gen=gen + 1, **record, best=generate_sympy_code(hof[0], ccl_objects).evalf(2))
 
-        if options['early_exit']:
-            if record['min'] < 1e-4:
-                break
-
     q.put(None)
     progress_process.join()
     pool.close()
@@ -568,7 +585,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     best_count = min(len(hof), options['top_results'])
     print(f'*** Best individuals encountered ({best_count}) ***')
     for i in range(best_count):
-        print(f'RMSD = {hof[i].fitness.values[0]: .4f}: ', generate_sympy_code(hof[i], ccl_objects).evalf(2))
+        print(f'{options["metric"]} = {hof[i].fitness.values[0]: .4f}: ', generate_sympy_code(hof[i], ccl_objects).evalf(2))
 
     if options['print_stats']:
         logbook.header = 'gen', 'min', 'med', 'max', 'best'
