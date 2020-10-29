@@ -56,8 +56,8 @@ class BondObject:
     pass
 
 
-def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, rng: random.Random, options: dict) -> Tuple[
-    gp.PrimitiveSetTyped, dict]:
+def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, rng: random.Random,
+                          options: dict) -> Tuple[gp.PrimitiveSetTyped, dict]:
     """Prepare set of primitives from which the individual is built"""
     input_types = []
     atom_names = []
@@ -114,10 +114,17 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
     primitive_set = gp.PrimitiveSetTyped('MAIN', input_types, float)
 
     primitive_set.addEphemeralConstant('rand', lambda: round(rng.random() * 2, 1), float)
+    primitive_set.addTerminal('1.0', float, '1.0')
+    primitive_set.addTerminal('2.0', float, '2.0')
     primitive_set.addPrimitive('add', [float, float], float, 'add')
     primitive_set.addPrimitive('sub', [float, float], float, 'sub')
     primitive_set.addPrimitive('mul', [float, float], float, 'mul')
     primitive_set.addPrimitive('div', [float, float], float, 'div')
+    primitive_set.addPrimitive('sqrt', [float], float, 'sqrt')
+    primitive_set.addPrimitive('cbrt', [float], float, 'cbrt')
+    primitive_set.addPrimitive('square', [float], float, 'square')
+    primitive_set.addPrimitive('cube', [float], float, 'cube')
+    primitive_set.addPrimitive('exp', [float], float, 'exp')
     primitive_set.addPrimitive('atom', [AtomObject], AtomObject, 'atom')
     primitive_set.addPrimitive('bond', [BondObject], BondObject, 'bond')
 
@@ -192,8 +199,14 @@ def generate_sympy_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
                 string = f'({args[0]}) * ({args[1]})'
             elif prim.name == 'div':
                 string = f'({args[0]}) / ({args[1]})'
-            elif prim.name == 'atom':
+            elif prim.name in {'atom', 'bond'}:
                 string = f'{args[0]}'
+            elif prim.name in {'sqrt', 'cbrt', 'exp'}:
+                string = f'{prim.name}({args[0]})'
+            elif prim.name == 'square':
+                string = f'({args[0]}) ** 2'
+            elif prim.name == 'cube':
+                string = f'({args[0]}) ** 3'
             elif prim.name == distance_name:
                 if args[0] == args[1]:
                     string = '0'
@@ -255,7 +268,17 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
                     string = args[0]
                 else:
                     string = f'({args[0]}) / ({args[1]})'
-            elif prim.name == 'atom':
+            elif prim.name == 'sqrt':
+                string = f'sqrt({args[0]})'
+            elif prim.name == 'cbrt':
+                string = f'({args[0]}) ^ (1.0 / 3.0)'
+            elif prim.name == 'square':
+                string = f'({args[0]}) ^ 2.0'
+            elif prim.name == 'cube':
+                string = f'({args[0]}) ^ 3.0'
+            elif prim.name == 'exp':
+                string = f'exp({args[0]})'
+            elif prim.name in {'atom', 'bond'}:
                 string = args[0]
             elif prim.name == distance_name:
                 if args[0] == args[1]:
