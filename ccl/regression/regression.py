@@ -476,6 +476,12 @@ def print_options(options: dict):
         print(f'{opt:<{max_size + 1}}', value)
 
 
+def evaluate_population(pop: List[gp.PrimitiveTree], toolbox: base.Toolbox, options: dict) -> None:
+    fitnesses = toolbox.map(toolbox.evaluate, pop)
+    for ind, fit in zip(pop, fitnesses):
+        ind.fitness.values = (fit[0], fit[1]) if options['metric'] == 'RMSD' else (fit[1], fit[0])
+
+
 def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charges: str, parameters: str,
                             user_options: Optional[dict] = None):
     expr = initial_method.get_regression_expr()
@@ -556,9 +562,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     q.put(('gen', 0, len(pop)))
 
     progress_process.start()
-    fitnesses = toolbox.map(toolbox.evaluate, pop)
-    for ind, fit in zip(pop, fitnesses):
-        ind.fitness.values = (fit[0], fit[1]) if options['metric'] == 'RMSD' else (fit[1], fit[0])
+    evaluate_population(pop, toolbox, options)
 
     hof.update(pop)
     record = all_stats.compile(pop)
@@ -589,10 +593,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
         q.put(('gen', gen + 1, len(invalid_ind)))
 
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = (fit[0], fit[1]) if options['metric'] == 'RMSD' else (fit[1], fit[0])
-
+        evaluate_population(invalid_ind, toolbox, options)
         pop[:] = offspring
 
         hof.update(pop)
