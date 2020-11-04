@@ -308,11 +308,14 @@ def individual_eq(first: gp.PrimitiveTree, second: gp.PrimitiveTree, ccl_objects
 def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: dict, ccl_objects: dict, options: dict,
              message_queue: multiprocessing.Queue) -> Tuple[float, float]:
     """Evaluate individual by calculating RMSD or R2 between new and reference charges"""
-    sympy_expr = generate_sympy_code(individual, ccl_objects)
+    invalid_result = math.inf, -math.inf
+    try:
+        sympy_expr = generate_sympy_code(individual, ccl_objects)
+    except OverflowError:
+        message_queue.put(('Invalid', '<overflow>', invalid_result))
+        return invalid_result
 
     sympy_expr_evaluated = str(sympy_expr.evalf(2))
-
-    invalid_result = math.inf, -math.inf
 
     if sympy_expr.has(sympy.zoo):
         message_queue.put(('Invalid', sympy_expr_evaluated, invalid_result))
@@ -436,7 +439,10 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
     codes = set()
     for no, ind in enumerate(options['initial_seed']):
         x = creator.Individual(gp.PrimitiveTree.from_string(ind, primitive_set))
-        sympy_code = generate_sympy_code(x, ccl_objects).evalf(2)
+        try:
+            sympy_code = generate_sympy_code(x, ccl_objects).evalf(2)
+        except OverflowError:
+            raise RuntimeError(f'Initial individual causes overflow: {ind}')
         print(f'[Seed {no:2d} No mutation]: {sympy_code}')
         pop.append(x)
         i = 0
@@ -444,7 +450,10 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
         while i < options['initial_seed_mutations']:
             y = toolbox.clone(x)
             toolbox.mutate(y)
-            mut_sympy_code = generate_sympy_code(y, ccl_objects).evalf(2)
+            try:
+                mut_sympy_code = generate_sympy_code(y, ccl_objects).evalf(2)
+            except OverflowError:
+                continue
             if mut_sympy_code.has(sympy.zoo):
                 continue
             if mut_sympy_code in codes:
