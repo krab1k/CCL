@@ -41,7 +41,6 @@ default_options = {
     'seed': None,
     'chargefw2_dir': '/opt/chargefw2',
     'eigen_include': '/usr/include/eigen3',
-    'print_stats': True,
     'early_exit': False,
     'require_symmetry': False,
     'initial_seed': [],
@@ -434,7 +433,8 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
     return pop
 
 
-def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: dict, primitive_set: gp.PrimitiveSetTyped) -> List[gp.PrimitiveTree]:
+def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: dict,
+                           primitive_set: gp.PrimitiveSetTyped) -> List[gp.PrimitiveTree]:
     pop = []
     codes = set()
     for no, ind in enumerate(options['initial_seed']):
@@ -527,7 +527,8 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     toolbox.register('evaluate', evaluate, method_skeleton=initial_method, cache=cache, ccl_objects=ccl_objects,
                      options=options, message_queue=q)
-    toolbox.register('select', ccl.regression.deap_gp.sel_double_tournament, fitness_size=10, parsimony_size=1.4, rng=rng)
+    toolbox.register('select', ccl.regression.deap_gp.sel_double_tournament, fitness_size=10, parsimony_size=1.4,
+                     rng=rng)
     toolbox.register('mate', ccl.regression.deap_gp.cx_one_point, rng=rng)
     toolbox.register('expr_mut', ccl.regression.deap_gp.gen_full, min_=0, max_=3, rng=rng)
     toolbox.register('mutate', ccl.regression.deap_gp.mut_uniform, expr=toolbox.expr_mut, pset=pset, rng=rng)
@@ -553,6 +554,8 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     logbook = tools.Logbook()
 
     hof = tools.HallOfFame(options['top_results'], similar=functools.partial(individual_eq, ccl_objects=ccl_objects))
+
+    print_options(options)
 
     # Run GP algorithm
     print('*** Generating initial population ***')
@@ -607,7 +610,8 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
         hof.update(pop)
         record = all_stats.compile(pop)
-        logbook.record(gen=gen + 1, evals=len(invalid_ind), **record, best=generate_sympy_code(hof[0], ccl_objects).evalf(2))
+        logbook.record(gen=gen + 1, evals=len(invalid_ind), **record,
+                       best=generate_sympy_code(hof[0], ccl_objects).evalf(2))
 
     q.put(None)
     progress_process.join()
@@ -634,12 +638,11 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
               f'{rmsd_selected}RMSD = {hof[i].fitness.values[rmsd_idx]: 8.4f}: ',
               generate_sympy_code(hof[i], ccl_objects).evalf(2))
 
-    if options['print_stats']:
-        logbook.header = 'gen', 'evals', 'RMSD', 'R2', 'best'
-        logbook.chapters['RMSD'].header = 'min', 'med', 'max'
-        logbook.chapters['R2'].header = 'min', 'med', 'max'
-        print('\n*** Statistics over generations ***')
-        print(logbook)
+    logbook.header = 'gen', 'evals', 'RMSD', 'R2', 'best'
+    logbook.chapters['RMSD'].header = 'min', 'med', 'max'
+    logbook.chapters['R2'].header = 'min', 'med', 'max'
+    print('\n*** Statistics over generations ***')
+    print(logbook)
 
     time_format = '%d %B %Y: %H:%M:%S'
     print('\n*** Time stats ***')
