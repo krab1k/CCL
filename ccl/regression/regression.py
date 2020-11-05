@@ -321,7 +321,7 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
         message_queue.put(('Invalid', sympy_expr_evaluated, invalid_result))
         return invalid_result
 
-    if sympy_expr_evaluated in cache:
+    if str(sympy_expr_evaluated) in cache:
         message_queue.put(('Cached', sympy_expr_evaluated, cache[sympy_expr_evaluated]))
         return cache[sympy_expr_evaluated]
 
@@ -367,7 +367,7 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
         result = rmsd, r2
 
     message_queue.put(('Evaluated', sympy_expr_evaluated, result))
-    cache[str(sympy_expr)] = result
+    cache[str(sympy_expr_evaluated)] = result
     return result
 
 
