@@ -43,8 +43,11 @@ default_options = {
     'eigen_include': '/usr/include/eigen3',
     'early_exit': False,
     'require_symmetry': False,
-    'initial_seed': [],
+    'seeded_individuals': None,
     'initial_seed_mutations': 10,
+    'required_symbols': None,
+    'disabled_symbols': None,
+    'max_constant_allowed': None,
     'metric': 'RMSD'
 }
 
@@ -404,6 +407,26 @@ def progress_bar(q: multiprocessing.Queue, options: dict) -> None:
     best_bar.close()
 
 
+def check_symbols(individual: gp.PrimitiveTree, options: dict) -> bool:
+    """Check whether an individual contains required or disabled symbols"""
+    required = options['required_symbols'].copy() if options['required_symbols'] is not None else set()
+    disabled = options['disabled_symbols'] if options['disabled_symbols'] is not None else set()
+    for primitive in individual:
+        if primitive.name in disabled:
+            return False
+        elif primitive.name in required:
+            required.remove(primitive.name)
+
+    return len(required) == 0
+
+
+def check_max_constant(sympy_code: sympy.Expr, options: dict) -> bool:
+    for atom in sympy_code.atoms():
+        if atom.is_real and abs(atom) > options['max_constant_allowed']:
+            return False
+    return True
+
+
 def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict) -> List[gp.PrimitiveTree]:
     """Generate initial population"""
 
@@ -412,11 +435,15 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
     pbar = tqdm.tqdm(total=options['population_size'])
     while len(pop) < options['population_size']:
         ind = toolbox.individual()
+        if not check_symbols(ind, options):
+            continue
         try:
             sympy_code = generate_sympy_code(ind, ccl_objects).evalf(2)
             if sympy_code.has(sympy.zoo):
                 continue
         except OverflowError:
+            continue
+        if options['max_constant_allowed'] is not None and not check_max_constant(sympy_code, options):
             continue
         if options['require_symmetry']:
             if not check_symmetry(sympy_code, ccl_objects):
@@ -437,8 +464,16 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
                            primitive_set: gp.PrimitiveSetTyped) -> List[gp.PrimitiveTree]:
     pop = []
     codes = set()
-    for no, ind in enumerate(options['initial_seed']):
-        x = creator.Individual(gp.PrimitiveTree.from_string(ind, primitive_set))
+    raw_codes = []
+    with open(options['seeded_individuals']) as f:
+        for line in f:
+            raw_codes.append(line.strip())
+
+    for no, ind in enumerate(raw_codes):
+        try:
+            x = creator.Individual(gp.PrimitiveTree.from_string(ind, primitive_set))
+        except TypeError:
+            raise RuntimeError(f'Incorrect seeded individual (probably incorrect symbol): {ind}')
         try:
             sympy_code = generate_sympy_code(x, ccl_objects).evalf(2)
         except OverflowError:
@@ -449,11 +484,20 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
         codes.add(sympy_code)
         while i < options['initial_seed_mutations']:
             y = toolbox.clone(x)
-            toolbox.mutate(y)
+            try:
+                toolbox.mutate(y)
+            except IndexError:
+                raise RuntimeError(f'Incorrect seeded individual (probably wrong arity): {ind}')
+            if not check_symbols(y, options):
+                continue
             try:
                 mut_sympy_code = generate_sympy_code(y, ccl_objects).evalf(2)
             except OverflowError:
                 continue
+
+            if options['max_constant_allowed'] is not None and not check_max_constant(mut_sympy_code, options):
+                continue
+
             if mut_sympy_code.has(sympy.zoo):
                 continue
             if mut_sympy_code in codes:
@@ -562,9 +606,13 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     pop = generate_population(toolbox, ccl_objects, options)
 
-    if options['initial_seed']:
+    if options['seeded_individuals'] is not None:
         print('*** Seeding initial population ***')
-        pop.extend(add_seeded_individuals(toolbox, options, ccl_objects, pset))
+        try:
+            pop.extend(add_seeded_individuals(toolbox, options, ccl_objects, pset))
+        except Exception as e:
+            print(f'Error: {e}', file=sys.stderr)
+            exit(1)
 
     pool = multiprocessing.Pool(options['ncpus'], initializer=init, initargs=(dataset, ref_charges, parameters))
     toolbox.register('map', pool.map)
@@ -618,6 +666,11 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     pool.close()
 
     end_time = datetime.datetime.now().replace(microsecond=0)
+
+    if options['save_best'] is not None:
+        with open(options['save_best'], 'w') as f:
+            for ind in hof:
+                f.write(f'{ind}\n')
 
     print(f'\n{"=" * 30} RESULTS {"=" * 30}\n')
     print('\n*** Used files ***')
