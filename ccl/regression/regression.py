@@ -313,13 +313,12 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
     invalid_result = math.inf, -math.inf
     try:
         sympy_expr = generate_sympy_code(individual, ccl_objects)
-    except OverflowError:
-        message_queue.put(('Invalid', '<overflow>', invalid_result))
+        sympy_expr_evaluated = str(sympy_expr.evalf(2))
+    except:
+        message_queue.put(('Invalid', '<expr-error>', invalid_result))
         return invalid_result
 
-    sympy_expr_evaluated = str(sympy_expr.evalf(2))
-
-    if sympy_expr.has(sympy.zoo):
+    if sympy_expr.has(sympy.zoo, sympy.oo, sympy.nan):
         message_queue.put(('Invalid', sympy_expr_evaluated, invalid_result))
         return invalid_result
 
@@ -439,9 +438,9 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
             continue
         try:
             sympy_code = generate_sympy_code(ind, ccl_objects).evalf(2)
-            if sympy_code.has(sympy.zoo):
+            if sympy_code.has(sympy.zoo, sympy.oo, sympy.nan):
                 continue
-        except OverflowError:
+        except:
             continue
         if options['max_constant_allowed'] is not None and not check_max_constant(sympy_code, options):
             continue
@@ -476,8 +475,8 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
             raise RuntimeError(f'Incorrect seeded individual (probably incorrect symbol): {ind}')
         try:
             sympy_code = generate_sympy_code(x, ccl_objects).evalf(2)
-        except OverflowError:
-            raise RuntimeError(f'Initial individual causes overflow: {ind}')
+        except:
+            raise RuntimeError(f'Initial individual causes problem: {ind}')
         print(f'[Seed {no:2d} No mutation]: {sympy_code}')
         pop.append(x)
         i = 0
@@ -492,15 +491,16 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
                 continue
             try:
                 mut_sympy_code = generate_sympy_code(y, ccl_objects).evalf(2)
-            except OverflowError:
+            except:
+                continue
+
+            if mut_sympy_code in codes:
+                continue
+
+            if mut_sympy_code.has(sympy.zoo, sympy.oo, sympy.nan):
                 continue
 
             if options['max_constant_allowed'] is not None and not check_max_constant(mut_sympy_code, options):
-                continue
-
-            if mut_sympy_code.has(sympy.zoo):
-                continue
-            if mut_sympy_code in codes:
                 continue
 
             if options['require_symmetry']:
@@ -612,7 +612,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
             pop.extend(add_seeded_individuals(toolbox, options, ccl_objects, pset))
         except Exception as e:
             print(f'Error: {e}', file=sys.stderr)
-            exit(1)
+            raise e
 
     pool = multiprocessing.Pool(options['ncpus'], initializer=init, initargs=(dataset, ref_charges, parameters))
     toolbox.register('map', pool.map)
