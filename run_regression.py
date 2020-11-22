@@ -24,7 +24,7 @@ def main():
     options.add_argument('--seed', type=int, default=None, help='Seed for the random number generator')
     options.add_argument('--require-symmetry', action='store_true', default=False,
                          help='Require symmetry in atom/bond objects in the initial population')
-    options.add_argument('--metric', type=str, choices=['R2', 'RMSD'], default='RMSD',
+    options.add_argument('--metric', type=str, choices=['R2', 'RMSD', 'COMBINED'], default='RMSD',
                          help='Metric to evaluate fitness')
     options.add_argument('--ncpus', type=int, default=None, help='Number of CPUs to use')
     options.add_argument('--early-exit', action='store_true', default=False,

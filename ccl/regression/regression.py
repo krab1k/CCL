@@ -307,10 +307,24 @@ def individual_eq(first: gp.PrimitiveTree, second: gp.PrimitiveTree, ccl_objects
     return generate_sympy_code(first, ccl_objects) == generate_sympy_code(second, ccl_objects)
 
 
+def get_objective_value(fitness: Tuple[float, float, float, float], options: dict) -> float:
+
+    def map_to_01(x: float, half: float) -> float:
+        return 2 / math.pi * math.atan(x / half)
+
+    if options['metric'] == 'COMBINED':
+        # Combine R2 and RMSD into metric ranging from 0 to 1
+        return 0.5 * (1 - fitness[1] + map_to_01(fitness[0], 0.1))
+    elif options['metric'] == 'RMSD':
+        return fitness[0]
+    else:
+        return 1 - fitness[1]
+
+
 def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: dict, ccl_objects: dict, options: dict,
-             message_queue: multiprocessing.Queue) -> Tuple[float, float]:
+             message_queue: multiprocessing.Queue) -> Tuple[float, float, float, float, float]:
     """Evaluate individual by calculating RMSD or R2 between new and reference charges"""
-    invalid_result = math.inf, -math.inf
+    invalid_result = math.inf, -math.inf, math.inf, math.inf, math.inf
     try:
         sympy_expr = generate_sympy_code(individual, ccl_objects)
         sympy_expr_evaluated = str(sympy_expr.evalf(2))
@@ -358,14 +372,14 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
         return invalid_result
 
     global data
-    rmsd, r2 = chargefw2_python.evaluate(data, f'{tmpdir}/libREGRESSION.so')
+    rmsd, r2, dmax, davg = chargefw2_python.evaluate(data, f'{tmpdir}/libREGRESSION.so')
 
     shutil.rmtree(tmpdir)
 
     if rmsd < 0 or r2 < 0:
         result = invalid_result
     else:
-        result = rmsd, r2
+        result = get_objective_value((rmsd, r2, dmax, davg), options), rmsd, r2, dmax, davg
 
     message_queue.put(('Evaluated', sympy_expr_evaluated, result))
     cache[str(sympy_expr_evaluated)] = result
@@ -377,11 +391,7 @@ def progress_bar(q: multiprocessing.Queue, options: dict) -> None:
     p_bar = tqdm.tqdm(total=0, position=1, desc='Progress inside generation')
     best_bar = tqdm.tqdm(total=0, position=2, bar_format='{desc}')
 
-    metric = options['metric']
-
-    best_rmsd = math.inf
-    best_r2 = -math.inf
-    rmsd_selected, r2_selected = ('*', '') if metric == 'RMSD' else ('', '*')
+    best_obj = math.inf
 
     i = 1
     for message in iter(q.get, None):
@@ -390,16 +400,20 @@ def progress_bar(q: multiprocessing.Queue, options: dict) -> None:
             gen_bar.update()
             p_bar.reset(total=message[2])
         else:
-            kind, expr, (rmsd, r2) = message
-            p_bar.write(f'[{i:>6}] {kind:>9} ({r2_selected}R2 = {r2:6.4f} | {rmsd_selected}RMSD = {rmsd:8.4f}): {expr}')
+            kind, expr, (obj, rmsd, r2, dmax, davg) = message
+            p_bar.write(f'[{i:>6}] {kind:>9} (Obj = {obj:8.4f} | R2 = {r2:6.4f} | RMSD = {rmsd:8.4f} | '
+                        f'Dmax = {dmax:8.2e} | Davg = {davg:8.4f}): {expr}')
             p_bar.update()
             i += 1
-            if (metric == 'RMSD' and rmsd < best_rmsd) or (metric == 'R2' and r2 > best_r2):
+            if obj < best_obj:
+                best_obj = obj
                 best_rmsd = rmsd
                 best_r2 = r2
+                best_dmax = dmax
+                best_davg = davg
                 best_individual = expr
-                best_bar.set_description_str(f'Best so far: {r2_selected}R2 = {best_r2:6.4f} | '
-                                             f'{rmsd_selected}RMSD = {best_rmsd:8.4f} : {best_individual}')
+                best_bar.set_description_str(f'Obj = {best_obj:8.4f} | R2 = {best_r2:6.4f} | RMSD = {best_rmsd:8.4f} | '
+                                             f'Dmax = {best_dmax:8.2e} | Davg = {best_davg:8.4f}): {best_individual}')
 
     gen_bar.close()
     p_bar.close()
@@ -529,10 +543,10 @@ def print_options(options: dict):
         print(f'{opt:<{max_size + 1}}', value)
 
 
-def evaluate_population(pop: List[gp.PrimitiveTree], toolbox: base.Toolbox, options: dict) -> None:
+def evaluate_population(pop: List[gp.PrimitiveTree], toolbox: base.Toolbox) -> None:
     fitnesses = toolbox.map(toolbox.evaluate, pop)
     for ind, fit in zip(pop, fitnesses):
-        ind.fitness.values = (fit[0], fit[1]) if options['metric'] == 'RMSD' else (fit[1], fit[0])
+        ind.fitness.values = fit
 
 
 def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charges: str, parameters: str,
@@ -557,10 +571,8 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     # Setup GP toolbox
     pset, ccl_objects = prepare_primitive_set(table, expr, rng, options)
 
-    if options['metric'] == 'RMSD':
-        creator.create('FitnessMin', base.Fitness, weights=(-1.0, 1.0))
-    else:
-        creator.create('FitnessMin', base.Fitness, weights=(1.0, -1.0))
+    # Main metric, RMSD, R2, Dmax, Davg
+    creator.create('FitnessMin', base.Fitness, weights=(-1.0, -1.0, 1.0, -1.0, -1.0))
 
     creator.create('Individual', gp.PrimitiveTree, fitness=creator.FitnessMin)
 
@@ -581,15 +593,12 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     toolbox.decorate('mate', gp.staticLimit(operator.attrgetter('height'), 17))
     toolbox.decorate('mutate', gp.staticLimit(operator.attrgetter('height'), 17))
 
-    if options['metric'] == 'RMSD':
-        rmsd_idx, r2_idx = 0, 1
-    else:
-        rmsd_idx, r2_idx = 1, 0
+    rmsd_stats = tools.Statistics(key=lambda x: x.fitness.values[1])
+    r2_stats = tools.Statistics(key=lambda x: x.fitness.values[2])
+    dmax_stats = tools.Statistics(key=lambda x: x.fitness.values[3])
+    davg_stats = tools.Statistics(key=lambda x: x.fitness.values[4])
 
-    rmsd_stats = tools.Statistics(key=lambda x: x.fitness.values[rmsd_idx])
-    r2_stats = tools.Statistics(key=lambda x: x.fitness.values[r2_idx])
-
-    all_stats = tools.MultiStatistics(RMSD=rmsd_stats, R2=r2_stats)
+    all_stats = tools.MultiStatistics(RMSD=rmsd_stats, R2=r2_stats, Dmax=dmax_stats, Davg=davg_stats)
 
     all_stats.register('min', lambda x: np.min(np.array(x)[np.isfinite(x)]))
     all_stats.register('med', lambda x: np.median(np.array(x)[np.isfinite(x)]))
@@ -622,7 +631,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     q.put(('gen', 0, len(pop)))
 
     progress_process.start()
-    evaluate_population(pop, toolbox, options)
+    evaluate_population(pop, toolbox)
 
     hof.update(pop)
     record = all_stats.compile(pop)
@@ -653,7 +662,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
         q.put(('gen', gen + 1, len(invalid_ind)))
 
-        evaluate_population(invalid_ind, toolbox, options)
+        evaluate_population(invalid_ind, toolbox)
         pop[:] = offspring
 
         hof.update(pop)
@@ -685,15 +694,19 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     best_count = min(len(hof), options['top_results'])
     print(f'\n*** Best individuals encountered ({best_count}) ***')
 
-    rmsd_selected, r2_selected = ('*', '') if options['metric'] == 'RMSD' else ('', '*')
     for i in range(best_count):
-        print(f'{r2_selected}R2 = {hof[i].fitness.values[r2_idx]: 6.4f}: | '
-              f'{rmsd_selected}RMSD = {hof[i].fitness.values[rmsd_idx]: 8.4f}: ',
+        print(f'Obj = {hof[i].fitness.values[0]: 6.4f} | ',
+              f'RMSD = {hof[i].fitness.values[1]: 6.4f} | ',
+              f'R2 = {hof[i].fitness.values[2]: 8.4f} | ',
+              f'Dmax = {hof[i].fitness.values[3]: 8.4f} | ',
+              f'Davg = {hof[i].fitness.values[4]: 8.4f}: ',
               generate_sympy_code(hof[i], ccl_objects).evalf(2))
 
-    logbook.header = 'gen', 'evals', 'RMSD', 'R2', 'best'
+    logbook.header = 'gen', 'evals', 'RMSD', 'R2', 'Dmax', 'Davg', 'best'
     logbook.chapters['RMSD'].header = 'min', 'med', 'max'
     logbook.chapters['R2'].header = 'min', 'med', 'max'
+    logbook.chapters['Dmax'].header = 'min', 'med', 'max'
+    logbook.chapters['Davg'].header = 'min', 'med', 'max'
     print('\n*** Statistics over generations ***')
     print(logbook)
 
