@@ -332,7 +332,7 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
         message_queue.put(('Invalid', '<expr-error>', invalid_result))
         return invalid_result
 
-    if sympy_expr.has(sympy.zoo, sympy.oo, sympy.nan):
+    if sympy_expr.has(sympy.zoo, sympy.oo, sympy.nan, sympy.I):
         message_queue.put(('Invalid', sympy_expr_evaluated, invalid_result))
         return invalid_result
 
@@ -372,7 +372,11 @@ def evaluate(individual: gp.PrimitiveTree, method_skeleton: 'CCLMethod', cache: 
         return invalid_result
 
     global data
-    rmsd, r2, dmax, davg = chargefw2_python.evaluate(data, f'{tmpdir}/libREGRESSION.so')
+    try:
+        rmsd, r2, dmax, davg = chargefw2_python.evaluate(data, f'{tmpdir}/libREGRESSION.so')
+    except RuntimeError:
+        message_queue.put(('Invalid', sympy_expr_evaluated, invalid_result))
+        return invalid_result
 
     shutil.rmtree(tmpdir)
 
@@ -452,7 +456,7 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
             continue
         try:
             sympy_code = generate_sympy_code(ind, ccl_objects).evalf(2)
-            if sympy_code.has(sympy.zoo, sympy.oo, sympy.nan):
+            if sympy_code.has(sympy.zoo, sympy.oo, sympy.nan, sympy.I):
                 continue
         except:
             continue
@@ -511,7 +515,7 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
             if mut_sympy_code in codes:
                 continue
 
-            if mut_sympy_code.has(sympy.zoo, sympy.oo, sympy.nan):
+            if mut_sympy_code.has(sympy.zoo, sympy.oo, sympy.nan, sympy.I):
                 continue
 
             if options['max_constant_allowed'] is not None and not check_max_constant(mut_sympy_code, options):
