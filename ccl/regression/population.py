@@ -21,11 +21,11 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
         if options['required_symbols'] and not check_required_symbols(ind, options):
             continue
         try:
-            sympy_expr = generate_sympy_expr(ind, ccl_objects).evalf(2)
+            sympy_expr = generate_sympy_expr(ind, ccl_objects)
             if sympy_expr.has(sympy.zoo, sympy.oo, sympy.nan, sympy.I):
                 continue
             sympy_code = str(sympy_expr)
-        except:
+        except RuntimeError:
             continue
 
         if options['max_constant_allowed'] is not None and not check_max_constant(sympy_expr, options):
@@ -64,8 +64,8 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
         except TypeError:
             raise RuntimeError(f'Incorrect seeded individual (probably incorrect symbol): {ind}')
         try:
-            sympy_code = str(generate_sympy_expr(x, ccl_objects).evalf(2))
-        except:
+            sympy_code = str(generate_sympy_expr(x, ccl_objects))
+        except RuntimeError:
             raise RuntimeError(f'Initial individual causes problem: {ind}')
         print(f'[Seed {no:2d} No mutation]: {sympy_code}')
         x.sympy_code = sympy_code
@@ -81,9 +81,9 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
             if options['required_symbols'] and not check_required_symbols(y, options):
                 continue
             try:
-                mut_sympy_expr = generate_sympy_expr(y, ccl_objects).evalf(2)
+                mut_sympy_expr = generate_sympy_expr(y, ccl_objects)
                 mut_sympy_code = str(mut_sympy_expr)
-            except:
+            except RuntimeError:
                 continue
 
             if mut_sympy_code in codes:

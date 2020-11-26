@@ -123,11 +123,11 @@ def evaluate_population(pop: List[gp.PrimitiveTree], toolbox: base.Toolbox) -> N
 def generate_sympy_code(x: gp.PrimitiveTree, ccl_objects: dict) -> str:
     """Generate sympy code for an individual"""
     try:
-        sympy_expr = generate_sympy_expr(x, ccl_objects).evalf(2)
+        sympy_expr = generate_sympy_expr(x, ccl_objects)
         sympy_code = str(sympy_expr)
         if sympy_expr.has(sympy.zoo, sympy.oo, sympy.nan, sympy.I):
             return f'<non-real>: {sympy_code}'
-    except:
+    except RuntimeError:
         return '<expr-error>'
     return str(sympy_expr)
 

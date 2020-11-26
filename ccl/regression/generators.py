@@ -49,7 +49,12 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
                 break  # If stack is empty, all nodes should have been seen
             stack[-1][1].append(string)
 
-    return sympy.sympify(string, locals=variables)
+    try:
+        sympy_expr = sympy.sympify(string, locals=variables).evalf(2)
+    except:
+        raise RuntimeError('Sympy cannot process the expression')
+
+    return sympy_expr
 
 
 def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> str:
