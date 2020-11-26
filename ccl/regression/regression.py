@@ -88,7 +88,8 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     creator.create('Individual', gp.PrimitiveTree, fitness=creator.FitnessMin, sympy_code='')
 
     toolbox = base.Toolbox()
-    toolbox.register('expr', ccl.regression.deap_gp.gen_grow, pset=pset, min_=1, max_=6, rng=rng)
+    toolbox.register('expr', ccl.regression.deap_gp.gen_half_and_half, pset=pset, min_=1, max_=6, rng=rng,
+                     options=options)
     toolbox.register('individual', tools.initIterate, creator.Individual, toolbox.expr)
     toolbox.register('population', tools.initRepeat, list, toolbox.individual)
 
@@ -97,7 +98,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     toolbox.register('select', ccl.regression.deap_gp.sel_double_tournament, fitness_size=10, parsimony_size=1.4,
                      rng=rng)
     toolbox.register('mate', ccl.regression.deap_gp.cx_one_point, rng=rng)
-    toolbox.register('expr_mut', ccl.regression.deap_gp.gen_full, min_=0, max_=3, rng=rng)
+    toolbox.register('expr_mut', ccl.regression.deap_gp.gen_full, min_=0, max_=3, rng=rng, options=options)
     toolbox.register('mutate', ccl.regression.deap_gp.mut_uniform, expr=toolbox.expr_mut, pset=pset, rng=rng)
     toolbox.register('mutate_shrink', ccl.regression.deap_gp.mut_shrink, rng=rng)
 

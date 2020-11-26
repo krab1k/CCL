@@ -17,8 +17,8 @@ default_options = {
     'require_symmetry': False,
     'seeded_individuals': None,
     'initial_seed_mutations': 10,
-    'required_symbols': None,
-    'disabled_symbols': None,
+    'required_symbols': set(),
+    'disabled_symbols': set(),
     'max_constant_allowed': None,
     'metric': 'RMSD'
 }

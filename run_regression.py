@@ -37,9 +37,9 @@ def main():
                          help='Max constant that can appear in the initial population')
     options.add_argument('--use-math-functions', action='store_true', default=False,
                          help='Allow additional math functions like sin or cos')
-    options.add_argument('--required-symbols', type=str, nargs='+', default=None,
+    options.add_argument('--required-symbols', type=str, nargs='+', default=[],
                          help='List of symbols that must appear in each individual of the initial population')
-    options.add_argument('--disabled-symbols', type=str, nargs='+', default=None,
+    options.add_argument('--disabled-symbols', type=str, nargs='+', default=[],
                          help='List of symbols that must not appear in each individual of the initial population')
 
     sys_dirs = parser.add_argument_group('System directories')
@@ -49,6 +49,9 @@ def main():
                           help='ChargeFW2 installation directory')
 
     parsed_options = vars(parser.parse_args())
+
+    parsed_options['required_symbols'] = set(parsed_options['required_symbols'])
+    parsed_options['disabled_symbols'] = set(parsed_options['disabled_symbols'])
 
     method = CCLMethod.from_file(parsed_options['ccl_code'])
 

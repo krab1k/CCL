@@ -18,22 +18,19 @@ def check_symmetry(sympy_expr: sympy.Expr, ccl_objects: dict) -> bool:
     return (sympy_expr - sympy_expr_swapped) == 0
 
 
-def check_symbols(individual: gp.PrimitiveTree, options: dict) -> bool:
+def check_required_symbols(individual: gp.PrimitiveTree, options: dict) -> bool:
     """Check whether an individual contains required or disabled symbols"""
-    required = options['required_symbols'].copy() if options['required_symbols'] is not None else set()
-    disabled = options['disabled_symbols'] if options['disabled_symbols'] is not None else set()
+    required = set(options['required_symbols'])
     for primitive in individual:
-        if primitive.name in disabled:
-            return False
-        elif primitive.name in required:
+        if primitive.name in required:
             required.remove(primitive.name)
 
     return len(required) == 0
 
 
-def check_max_constant(sympy_code: sympy.Expr, options: dict) -> bool:
+def check_max_constant(sympy_expr: sympy.Expr, options: dict) -> bool:
     """Check whether the expression contains constant that is higher than allowed"""
-    for atom in sympy_code.atoms():
+    for atom in sympy_expr.atoms():
         if atom.is_real and abs(atom) > options['max_constant_allowed']:
             return False
     return True

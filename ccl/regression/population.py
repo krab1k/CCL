@@ -6,7 +6,7 @@ import sympy
 import tqdm
 from deap import base, gp, creator
 
-from ccl.regression.constraints import check_symbols, check_max_constant, check_symmetry
+from ccl.regression.constraints import check_required_symbols, check_max_constant, check_symmetry
 from ccl.regression.generators import generate_sympy_expr
 
 
@@ -18,7 +18,7 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
     pbar = tqdm.tqdm(total=options['population_size'])
     while len(pop) < options['population_size']:
         ind = toolbox.individual()
-        if not check_symbols(ind, options):
+        if options['required_symbols'] and not check_required_symbols(ind, options):
             continue
         try:
             sympy_expr = generate_sympy_expr(ind, ccl_objects).evalf(2)
@@ -27,16 +27,19 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
             sympy_code = str(sympy_expr)
         except:
             continue
+
         if options['max_constant_allowed'] is not None and not check_max_constant(sympy_expr, options):
             continue
-        if options['require_symmetry']:
-            if not check_symmetry(sympy_expr, ccl_objects):
-                continue
+
         if options['unique_population']:
             if sympy_code in codes:
                 continue
-            codes.add(sympy_code)
 
+        if options['require_symmetry']:
+            if not check_symmetry(sympy_expr, ccl_objects):
+                continue
+
+        codes.add(sympy_code)
         ind.sympy_code = sympy_code
         pop.append(ind)
         pbar.update()
@@ -75,7 +78,7 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
                 toolbox.mutate(y)
             except IndexError:
                 raise RuntimeError(f'Incorrect seeded individual (probably wrong arity): {ind}')
-            if not check_symbols(y, options):
+            if options['required_symbols'] and not check_required_symbols(y, options):
                 continue
             try:
                 mut_sympy_expr = generate_sympy_expr(y, ccl_objects).evalf(2)
