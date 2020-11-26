@@ -45,7 +45,7 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
         elif isinstance(s, ccl.symboltable.ParameterSymbol):
             if s.type == ccl.types.ParameterType.ATOM:
                 atom_parameters.append(s.name)
-            else:
+            elif s.type == ccl.types.ParameterType.COMMON:
                 common_parameters.append(s.name)
         elif isinstance(s, ccl.symboltable.VariableSymbol):
             # Check whether the name was defined on the same line or later and thus cannot be used
@@ -98,7 +98,7 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
     if distance_name is not None:
         if len(atom_names) != 2:
             raise RuntimeError(f'Distance symbol {distance_name} defined, but 2 atoms variables are required')
-        primitive_set.addPrimitive(distance_name, [AtomObject, AtomObject], float, distance_name)
+        primitive_set.addTerminal(distance_name, float, distance_name)
 
     primitive_set.renameArguments(**{f'ARG{i}': name for i, name in enumerate(atom_names)})
 

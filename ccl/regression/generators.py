@@ -13,6 +13,8 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
     distance_name = ccl_objects.get('distance', None)
     variables = {}
 
+    atom_names = ccl_objects['atom_objects']
+
     if distance_name is not None:
         variables[distance_name] = sympy.Function(distance_name, positive=True, real=True)
 
@@ -36,13 +38,8 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
                 string = f'({args[0]}) ** 2'
             elif prim.name == 'cube':
                 string = f'({args[0]}) ** 3'
-            elif prim.name == distance_name:
-                if args[0] == args[1]:
-                    string = '0'
-                elif args[0] < args[1]:
-                    string = f'{distance_name}({args[0]}{args[1]})'
-                else:
-                    string = f'{distance_name}({args[1]}{args[0]})'
+            elif distance_name is not None and prim.name == distance_name:
+                string = f'{distance_name}({atom_names[0]}{atom_names[1]})'
             elif prim.name in ccl_objects['single_argument']:
                 string = f'{prim.name}({args[0]})'
                 variables[prim.name] = sympy.Function(prim.name, real=True)
@@ -60,6 +57,8 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
     string = ''
     stack = []
     distance_name = ccl_objects.get('distance', None)
+    atom_names = ccl_objects['atom_objects']
+
     for node in expr:
         stack.append((node, []))
         while len(stack[-1][1]) == stack[-1][0].arity:
@@ -110,13 +109,8 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
                 string = f'exp({args[0]})'
             elif prim.name in {'atom', 'bond'}:
                 string = args[0]
-            elif prim.name == distance_name:
-                if args[0] == args[1]:
-                    string = '0.0'
-                elif args[0] < args[1]:
-                    string = f'{distance_name}[{args[0]}, {args[1]}]'
-                else:
-                    string = f'{distance_name}[{args[1]}, {args[0]}]'
+            elif distance_name is not None and prim.name == distance_name:
+                string = f'{distance_name}[{atom_names[0]}, {atom_names[1]}]'
             elif prim.name in ccl_objects['single_argument']:
                 string = f'{prim.name}[{args[0]}]'
             else:
