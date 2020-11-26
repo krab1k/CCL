@@ -76,7 +76,10 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
 
     primitive_set = gp.PrimitiveSetTyped('MAIN', input_types, float)
 
-    primitive_set.addEphemeralConstant('rand', lambda: round(rng.random() * 2, 1), float)
+    if options['allow_random_constants']:
+        primitive_set.addEphemeralConstant('rand', lambda: round(rng.random() * 2, 1), float)
+
+    primitive_set.addTerminal('0.5', float, '0.5')
     primitive_set.addTerminal('1.0', float, '1.0')
     primitive_set.addTerminal('2.0', float, '2.0')
     primitive_set.addPrimitive('add', [float, float], float, 'add')

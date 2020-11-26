@@ -37,6 +37,8 @@ def main():
                          help='Max constant that can appear in the initial population')
     options.add_argument('--use-math-functions', action='store_true', default=False,
                          help='Allow additional math functions like sin or cos')
+    options.add_argument('--allow-random-constants', action='store_true', default=False,
+                         help='Allow to generate random constants in range [0; 2]')
     options.add_argument('--required-symbols', type=str, nargs='+', default=[],
                          help='List of symbols that must appear in each individual of the initial population')
     options.add_argument('--disabled-symbols', type=str, nargs='+', default=[],
