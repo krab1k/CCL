@@ -7,44 +7,40 @@ from typing import List, Tuple, Callable
 from deap import gp
 
 
-def gen_full(pset: gp.PrimitiveSetTyped, min_: int, max_: int, rng: random.Random, options: dict,
-             type_=None) -> List[gp.Primitive]:
+def gen_full(pset: gp.PrimitiveSetTyped, min_: int, max_: int, rng: random.Random, type_=None) -> List[gp.Primitive]:
     def condition(height: int, depth: int) -> bool:
         """Expression generation stops when the depth is equal to height."""
         return depth == height
 
-    return generate(pset, min_, max_, condition, rng, options, type_)
+    return generate(pset, min_, max_, condition, rng, type_)
 
 
-def gen_grow(pset: gp.PrimitiveSetTyped, min_: int, max_: int, rng: random.Random, options: dict,
-             type_=None) -> List[gp.Primitive]:
+def gen_grow(pset: gp.PrimitiveSetTyped, min_: int, max_: int, rng: random.Random, type_=None) -> List[gp.Primitive]:
     def condition(height: int, depth: int) -> bool:
         return depth == height or (depth >= min_ and rng.random() < pset.terminalRatio)
 
-    return generate(pset, min_, max_, condition, rng, options, type_)
+    return generate(pset, min_, max_, condition, rng, type_)
 
 
-def gen_half_and_half(pset: gp.PrimitiveSetTyped, min_: int, max_: int, rng: random.Random, options: dict,
+def gen_half_and_half(pset: gp.PrimitiveSetTyped, min_: int, max_: int, rng: random.Random,
                       type_=None) -> List[gp.Primitive]:
     method = rng.choice((gen_grow, gen_full))
-    return method(pset, min_, max_, rng, options, type_)
+    return method(pset, min_, max_, rng, type_)
 
 
 def generate(pset: gp.PrimitiveSetTyped, min_: int, max_: int, condition: Callable[[int, int], bool],
-             rng: random.Random, options: dict, type_=None) -> List[gp.Primitive]:
+             rng: random.Random, type_=None) -> List[gp.Primitive]:
     if type_ is None:
         type_ = pset.ret
     expr = []
     height = rng.randint(min_, max_)
     stack = [(0, type_)]
 
-    disabled = options['disabled_symbols']
-
     while len(stack) != 0:
         depth, type_ = stack.pop()
         if condition(height, depth):
             try:
-                term = rng.choice([x for x in pset.terminals[type_] if x.name not in disabled])
+                term = rng.choice(pset.terminals[type_])
             except IndexError:
                 _, _, traceback = sys.exc_info()
                 raise IndexError('The generate function tried to add a terminal of type "%s", but there is '
@@ -54,7 +50,7 @@ def generate(pset: gp.PrimitiveSetTyped, min_: int, max_: int, condition: Callab
             expr.append(term)
         else:
             try:
-                prim = rng.choice([x for x in pset.primitives[type_] if x.name not in disabled])
+                prim = rng.choice(pset.primitives[type_])
             except IndexError:
                 _, _, traceback = sys.exc_info()
                 raise IndexError('The generate function tried to add a primitive of type "%s", but there is '

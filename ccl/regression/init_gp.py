@@ -1,7 +1,7 @@
 """Initialization of the GP primitive set"""
 
 import random
-from typing import Tuple
+from typing import Tuple, List, Iterable
 
 from deap import gp
 
@@ -18,6 +18,14 @@ class AtomObject:
 def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, rng: random.Random,
                           options: dict) -> Tuple[gp.PrimitiveSetTyped, dict]:
     """Prepare set of primitives from which the individual is built"""
+
+    def filter_disabled_terms(terms: Iterable[str]) -> List[str]:
+        """Return only terms which are not disabled"""
+        return [x for x in terms if x not in options['disabled_symbols']]
+
+    if options['required_symbols'] & options['disabled_symbols']:
+        raise RuntimeError('Cannot define symbol as required and disabled at the same time')
+
     input_types = []
     atom_names = []
 
@@ -76,26 +84,26 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
     primitive_set.addPrimitive('exp', [float], float, 'exp')
     primitive_set.addPrimitive('atom', [AtomObject], AtomObject, 'atom')
 
-    for ap in atom_parameters:
+    for ap in filter_disabled_terms(atom_parameters):
         primitive_set.addPrimitive(ap, [AtomObject], float, ap)
 
-    for cp in common_parameters:
+    for cp in filter_disabled_terms(common_parameters):
         primitive_set.addTerminal(cp, float, cp)
 
-    for v in simple_variables:
+    for v in filter_disabled_terms(simple_variables):
         primitive_set.addTerminal(v, float, v)
 
-    for array_atom in atom_array_variables:
+    for array_atom in filter_disabled_terms(atom_array_variables):
         primitive_set.addPrimitive(array_atom, [AtomObject], float, array_atom)
 
     if options['use_math_functions']:
-        for math_fn in ccl.functions.MATH_FUNCTIONS:
+        for math_fn in filter_disabled_terms(ccl.functions.MATH_FUNCTIONS):
             primitive_set.addPrimitive(math_fn, [float], float, math_fn)
 
-    for f in atom_properties:
+    for f in filter_disabled_terms(atom_properties):
         primitive_set.addPrimitive(f, [AtomObject], float, f)
 
-    if distance_name is not None:
+    if distance_name is not None and distance_name not in options['disabled_symbols']:
         if len(atom_names) != 2:
             raise RuntimeError(f'Distance symbol {distance_name} defined, but 2 atoms variables are required')
         primitive_set.addTerminal(distance_name, float, distance_name)
