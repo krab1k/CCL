@@ -6,7 +6,7 @@ import sympy
 import tqdm
 from deap import base, gp, creator
 
-from ccl.regression.constraints import check_required_symbols, check_max_constant, check_symmetry
+from ccl.regression.constraints import check_required_symbols, check_max_constant
 from ccl.regression.generators import generate_sympy_expr
 
 
@@ -33,10 +33,6 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
 
         if options['unique_population']:
             if sympy_code in codes:
-                continue
-
-        if options['require_symmetry']:
-            if not check_symmetry(sympy_expr, ccl_objects):
                 continue
 
         codes.add(sympy_code)
@@ -94,10 +90,6 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
 
             if options['max_constant_allowed'] is not None and not check_max_constant(mut_sympy_expr, options):
                 continue
-
-            if options['require_symmetry']:
-                if not check_symmetry(mut_sympy_expr, ccl_objects):
-                    continue
 
             codes.add(mut_sympy_code)
             i += 1

@@ -84,24 +84,21 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
     primitive_set.addPrimitive('exp', [float], float, 'exp')
     primitive_set.addPrimitive('atom', [AtomObject], AtomObject, 'atom')
 
-    for ap in filter_disabled_terms(atom_parameters):
-        primitive_set.addPrimitive(ap, [AtomObject], float, ap)
+    if options['require_symmetry']:
+        for x in filter_disabled_terms(atom_parameters + atom_array_variables + atom_properties):
+            primitive_set.addTerminal(f'_sym_add_{x}', float, f'_sym_add_{x}')
+            primitive_set.addTerminal(f'_sym_inv_add_{x}', float, f'_sym_inv_add_{x}')
+            primitive_set.addTerminal(f'_sym_mul_{x}', float, f'_sym_mul_{x}')
+    else:
+        for x in filter_disabled_terms(atom_parameters + atom_array_variables + atom_properties):
+            primitive_set.addPrimitive(x, [AtomObject], float, x)
 
-    for cp in filter_disabled_terms(common_parameters):
-        primitive_set.addTerminal(cp, float, cp)
-
-    for v in filter_disabled_terms(simple_variables):
-        primitive_set.addTerminal(v, float, v)
-
-    for array_atom in filter_disabled_terms(atom_array_variables):
-        primitive_set.addPrimitive(array_atom, [AtomObject], float, array_atom)
+    for x in filter_disabled_terms(common_parameters + simple_variables):
+        primitive_set.addTerminal(x, float, x)
 
     if options['use_math_functions']:
         for math_fn in filter_disabled_terms(ccl.functions.MATH_FUNCTIONS):
             primitive_set.addPrimitive(math_fn, [float], float, math_fn)
-
-    for f in filter_disabled_terms(atom_properties):
-        primitive_set.addPrimitive(f, [AtomObject], float, f)
 
     if distance_name is not None and distance_name not in options['disabled_symbols']:
         if len(atom_names) != 2:

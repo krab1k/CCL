@@ -4,28 +4,18 @@ import sympy
 from deap import gp
 
 
-def check_symmetry(sympy_expr: sympy.Expr, ccl_objects: dict) -> bool:
-    """Check whether the expression is symmetric in atom variables"""
-
-    objects = ccl_objects['atom_objects']
-    assert len(objects) in {0, 2}
-
-    if not objects:
-        return True
-
-    substitutions = {objects[0]: objects[1],
-                     objects[1]: objects[0]}
-
-    sympy_expr_swapped = sympy_expr.subs(substitutions, simultaneous=True)
-    return (sympy_expr - sympy_expr_swapped) == 0
-
-
 def check_required_symbols(individual: gp.PrimitiveTree, options: dict) -> bool:
     """Check whether an individual contains required or disabled symbols"""
     required = set(options['required_symbols'])
     for primitive in individual:
-        if primitive.name in required:
-            required.remove(primitive.name)
+        if primitive.name.startswith('_sym'):
+            name = primitive.name.split('_')[-1]
+        else:
+            name = primitive.name
+        if name in required:
+            required.remove(name)
+            if not required:
+                break
 
     return len(required) == 0
 

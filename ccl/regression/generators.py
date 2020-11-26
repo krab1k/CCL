@@ -43,6 +43,15 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
             elif prim.name in ccl_objects['single_argument']:
                 string = f'{prim.name}({args[0]})'
                 variables[prim.name] = sympy.Function(prim.name, real=True)
+            elif prim.name.startswith('_sym_add'):
+                name = prim.name.split('_')[-1]
+                string = f'({name}({atom_names[0]}) + {name}({atom_names[1]}))'
+            elif prim.name.startswith('_sym_inv_add'):
+                name = prim.name.split('_')[-1]
+                string = f'(1 / {name}({atom_names[0]}) + 1 / {name}({atom_names[1]}))'
+            elif prim.name.startswith('_sym_mul'):
+                name = prim.name.split('_')[-1]
+                string = f'({name}({atom_names[0]}) * {name}({atom_names[1]}))'
             else:
                 string = prim.format(*args)
             if len(stack) == 0:
@@ -112,6 +121,15 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
                 string = f'({args[0]}) ^ 3.0'
             elif prim.name == 'exp':
                 string = f'exp({args[0]})'
+            elif prim.name.startswith('_sym_add'):
+                name = prim.name.split('_')[-1]
+                string = f'({name}[{atom_names[0]}] + {name}[{atom_names[1]}])'
+            elif prim.name.startswith('_sym_inv_add'):
+                name = prim.name.split('_')[-1]
+                string = f'(1 / {name}[{atom_names[0]}] + 1.0 / {name}[{atom_names[1]}])'
+            elif prim.name.startswith('_sym_mul'):
+                name = prim.name.split('_')[-1]
+                string = f'({name}[{atom_names[0]}] * {name}[{atom_names[1]}])'
             elif prim.name in {'atom', 'bond'}:
                 string = args[0]
             elif distance_name is not None and prim.name == distance_name:
