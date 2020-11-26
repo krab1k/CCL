@@ -30,6 +30,9 @@ def init(dataset: str, ref_charges: str, parameters: str) -> None:
 def get_objective_value(fitness: Tuple[float, float, float, float], options: dict) -> float:
     """Return the value of the objective function"""
 
+    if any(not math.isfinite(x) for x in fitness):
+        return math.inf
+
     def map_to_01(x: float, half: float) -> float:
         """Map value from [0; oo) to [0; 1) using half as 0.5"""
         return 2 / math.pi * math.atan(x / half)
@@ -92,17 +95,18 @@ def evaluate(individual: 'creator.Individual', method_skeleton: 'CCLMethod', cac
 
     global data
     try:
-        rmsd, r2, dmax, davg = chargefw2_python.evaluate(data, f'{tmpdir}/libREGRESSION.so')
+        result = chargefw2_python.evaluate(data, f'{tmpdir}/libREGRESSION.so')
     except RuntimeError:
         message_queue.put(('Invalid', individual.sympy_code, invalid_result))
         return invalid_result
 
     shutil.rmtree(tmpdir)
 
-    if rmsd < 0 or r2 < 0:
+    # Check whether the charges were successfully computed
+    if any(x < 0 for x in result):
         result = invalid_result
     else:
-        result = get_objective_value((rmsd, r2, dmax, davg), options), rmsd, r2, dmax, davg
+        result = get_objective_value(result, options), *result
 
     message_queue.put(('Evaluated', individual.sympy_code, result))
     cache[individual.sympy_code] = result
