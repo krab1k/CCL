@@ -15,23 +15,14 @@ class AtomObject:
     pass
 
 
-class BondObject:
-    pass
-
-
 def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, rng: random.Random,
                           options: dict) -> Tuple[gp.PrimitiveSetTyped, dict]:
     """Prepare set of primitives from which the individual is built"""
     input_types = []
     atom_names = []
-    bond_names = []
-    object_names = []
 
     atom_properties = []
-    bond_properties = []
-
     atom_parameters = []
-    bond_parameters = []
     common_parameters = []
 
     simple_variables = []
@@ -46,22 +37,14 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
             if s.type == ccl.types.ObjectType.ATOM:
                 input_types.append(AtomObject)
                 atom_names.append(s.name)
-            else:
-                input_types.append(BondObject)
-                bond_names.append(s.name)
-            object_names.append(s.name)
         elif isinstance(s, ccl.symboltable.FunctionSymbol):
             if s.function.name in ccl.functions.ELEMENT_PROPERTIES:
                 atom_properties.append(s.name)
-            elif s.function.name == 'bond order':
-                bond_properties.append(s.name)
             elif s.function.name == 'distance':
                 distance_name = s.name
         elif isinstance(s, ccl.symboltable.ParameterSymbol):
             if s.type == ccl.types.ParameterType.ATOM:
                 atom_parameters.append(s.name)
-            elif s.type == ccl.types.ParameterType.BOND:
-                bond_parameters.append(s.name)
             else:
                 common_parameters.append(s.name)
         elif isinstance(s, ccl.symboltable.VariableSymbol):
@@ -92,13 +75,9 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
     primitive_set.addPrimitive('cube', [float], float, 'cube')
     primitive_set.addPrimitive('exp', [float], float, 'exp')
     primitive_set.addPrimitive('atom', [AtomObject], AtomObject, 'atom')
-    primitive_set.addPrimitive('bond', [BondObject], BondObject, 'bond')
 
     for ap in atom_parameters:
         primitive_set.addPrimitive(ap, [AtomObject], float, ap)
-
-    for bp in bond_parameters:
-        primitive_set.addPrimitive(bp, [BondObject], float, bp)
 
     for cp in common_parameters:
         primitive_set.addTerminal(cp, float, cp)
@@ -116,20 +95,19 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
     for f in atom_properties:
         primitive_set.addPrimitive(f, [AtomObject], float, f)
 
-    for f in bond_properties:
-        primitive_set.addPrimitive(f, [BondObject], float, f)
-
     if distance_name is not None:
+        if len(atom_names) != 2:
+            raise RuntimeError(f'Distance symbol {distance_name} defined, but 2 atoms variables are required')
         primitive_set.addPrimitive(distance_name, [AtomObject, AtomObject], float, distance_name)
 
-    primitive_set.renameArguments(**{f'ARG{i}': name for i, name in enumerate(object_names)})
+    primitive_set.renameArguments(**{f'ARG{i}': name for i, name in enumerate(atom_names)})
 
     if options['require_symmetry']:
-        if len(atom_names) not in (0, 2) or len(bond_names) not in (0, 2):
-            raise RuntimeError('Symmetry requires two variables of the same name')
+        if len(atom_names) not in (0, 2):
+            raise RuntimeError('Symmetry requires two atom variables or none')
 
     ccl_objects = {'distance': distance_name,
-                   'single_argument': atom_properties + bond_properties + atom_parameters + bond_parameters + atom_array_variables,
-                   'atom_objects': atom_names, 'bond_objects': bond_names}
+                   'single_argument': atom_properties + atom_parameters + atom_array_variables,
+                   'atom_objects': atom_names}
 
     return primitive_set, ccl_objects

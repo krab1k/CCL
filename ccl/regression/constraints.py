@@ -5,14 +5,16 @@ from deap import gp
 
 
 def check_symmetry(sympy_expr: sympy.Expr, ccl_objects: dict) -> bool:
-    """Check whether the expression is symmetric in atom or bond variables"""
-    substitutions = {}
-    for ab_type in ['atom_objects', 'bond_objects']:
-        if ccl_objects[ab_type]:
-            x = ccl_objects[ab_type][0]
-            y = ccl_objects[ab_type][1]
-            substitutions[x] = y
-            substitutions[y] = x
+    """Check whether the expression is symmetric in atom variables"""
+
+    objects = ccl_objects['atom_objects']
+    assert len(objects) in {0, 2}
+
+    if not objects:
+        return True
+
+    substitutions = {objects[0]: objects[1],
+                     objects[1]: objects[0]}
 
     sympy_expr_swapped = sympy_expr.subs(substitutions, simultaneous=True)
     return (sympy_expr - sympy_expr_swapped) == 0
