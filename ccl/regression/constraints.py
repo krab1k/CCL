@@ -14,8 +14,8 @@ def check_symmetry(sympy_expr: sympy.Expr, ccl_objects: dict) -> bool:
             substitutions[x] = y
             substitutions[y] = x
 
-    sympy_expr_swapped = sympy.simplify(sympy_expr.subs(substitutions, simultaneous=True))
-    return sympy_expr == sympy_expr_swapped
+    sympy_expr_swapped = sympy_expr.subs(substitutions, simultaneous=True)
+    return (sympy_expr - sympy_expr_swapped) == 0
 
 
 def check_symbols(individual: gp.PrimitiveTree, options: dict) -> bool:

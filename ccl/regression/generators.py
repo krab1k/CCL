@@ -11,6 +11,11 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
     string = ''
     stack = []
     distance_name = ccl_objects.get('distance', None)
+    variables = {}
+
+    if distance_name is not None:
+        variables[distance_name] = sympy.Function(distance_name, positive=True, real=True)
+
     for node in expr:
         stack.append((node, []))
         while len(stack[-1][1]) == stack[-1][0].arity:
@@ -40,13 +45,14 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
                     string = f'{distance_name}({args[1]}{args[0]})'
             elif prim.name in ccl_objects['single_argument']:
                 string = f'{prim.name}({args[0]})'
+                variables[prim.name] = sympy.Function(prim.name, real=True)
             else:
                 string = prim.format(*args)
             if len(stack) == 0:
                 break  # If stack is empty, all nodes should have been seen
             stack[-1][1].append(string)
 
-    return sympy.simplify(sympy.sympify(string))
+    return sympy.sympify(string, locals=variables)
 
 
 def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> str:
