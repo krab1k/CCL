@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 import sys
 import os
 from typing import Tuple, List, Optional
@@ -19,7 +20,7 @@ def read_charges(filename: str) -> List[float]:
 
 
 def correlation_plot(ref_charges_file: str, new_charges_file: str, output: str, title: Optional[str] = None) -> Tuple[
-    float, float, float, float]:
+                     float, float, float, float, float]:
     ref_charges = read_charges(ref_charges_file)
     new_charges = read_charges(new_charges_file)
 
@@ -29,6 +30,7 @@ def correlation_plot(ref_charges_file: str, new_charges_file: str, output: str, 
     dmax = np.max(np.abs(d))
     davg = np.mean(np.abs(d))
 
+    obj = 0.5 * (1 - r2 + 2 / math.pi * math.atan(rmsd / 0.1))
     fig, ax = plt.subplots()
     ax.scatter(ref_charges, new_charges, s=10)
 
@@ -51,10 +53,10 @@ def correlation_plot(ref_charges_file: str, new_charges_file: str, output: str, 
     if title is not None:
         plt.title(title)
 
-    plt.text(0.6, 0.1, f'RMSD = {rmsd:.3f}\nR2 = {r2:.3f}\nDmax = {dmax:.3f}\nDavg = {davg:.3f}',
+    plt.text(0.6, 0.1, f'RMSD = {rmsd:.3f}\nR2 = {r2:.3f}\nDmax = {dmax:.3f}\nDavg = {davg:.3f}\nObj = {obj:.3f}',
              transform=ax.transAxes)
     plt.savefig(output)
-    return rmsd, r2, dmax, davg
+    return rmsd, r2, dmax, davg, obj
 
 
 def main():
@@ -62,11 +64,12 @@ def main():
         print('Incorrect number of arguments.', file=sys.stderr)
         sys.exit(1)
 
-    rmsd, r2, dmax, davg = correlation_plot(sys.argv[1], sys.argv[2], sys.argv[3], title=sys.argv[4])
+    rmsd, r2, dmax, davg, obj = correlation_plot(sys.argv[1], sys.argv[2], sys.argv[3], title=sys.argv[4])
     print(f'RMSD = {rmsd:.3f}')
     print(f'R2 = {r2:.3f}')
     print(f'Dmax = {dmax:.3f}')
     print(f'Davg = {davg:.3f}')
+    print(f'Obj = {obj:.3f}')
 
 
 if __name__ == '__main__':
