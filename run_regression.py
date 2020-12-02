@@ -13,6 +13,7 @@ def main():
     files.add_argument('--parameters', type=str, required=True, help='Parameters required for the method')
     files.add_argument('--seeded-individuals', type=str, default=None, help='File with individuals to start with')
     files.add_argument('--save-best', type=str, default=None, help='File to store the best individuals')
+    files.add_argument('--results', type=str, default=None, help='File to store results')
 
     options = parser.add_argument_group('Regression options')
     options.add_argument('--population-size', type=int, default=500, help='Size of the initial population')

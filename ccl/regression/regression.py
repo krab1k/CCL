@@ -11,6 +11,7 @@ import numpy as np
 from typing import Optional
 import tqdm
 import datetime
+import logging
 
 import ccl.ast
 import ccl.symboltable
@@ -185,37 +186,46 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
             for ind in hof:
                 f.write(f'{ind}\n')
 
-    print(f'\n{"=" * 30} RESULTS {"=" * 30}\n')
-    print('\n*** Used files ***')
-    print(f'Structures       : {dataset}')
-    print(f'Reference charges: {ref_charges}')
-    print(f'Parameters:      : {parameters}')
+    logger = logging.getLogger('CCL Regression Logger')
+    logger.setLevel(logging.INFO)
+    logger.addHandler(logging.StreamHandler())
+    if options['results'] is not None:
+        logger.addHandler(logging.FileHandler(options['results']))
 
-    print('\n*** Original skeleton ***')
-    print(initial_method.source)
-    print_options(options)
+    logger.info(f'\n{"=" * 30} RESULTS {"=" * 30}\n')
+    logger.info('\n*** Used files ***')
+    logger.info(f'Structures       : {dataset}')
+    logger.info(f'Reference charges: {ref_charges}')
+    logger.info(f'Parameters:      : {parameters}')
+
+    logger.info('\n*** Original skeleton ***')
+    logger.info(initial_method.source)
+    logger.info('*** Settings ***')
+    max_size = max(len(opt) for opt in options)
+    for opt, value in options.items():
+        logger.info(f'{opt:<{max_size + 1}} {value}')
 
     best_count = min(len(hof), options['top_results'])
-    print(f'\n*** Best individuals encountered ({best_count}) ***')
+    logger.info(f'\n*** Best individuals encountered ({best_count}) ***')
 
     for i in range(best_count):
-        print(f'Obj = {hof[i].fitness.values[0]: 6.4f} | ',
-              f'RMSD = {hof[i].fitness.values[1]: 6.4f} | ',
-              f'R2 = {hof[i].fitness.values[2]: 8.4f} | ',
-              f'Dmax = {hof[i].fitness.values[3]: 8.4f} | ',
-              f'Davg = {hof[i].fitness.values[4]: 8.4f}: ',
-              hof[i].sympy_code)
+        logger.info(f'Obj = {hof[i].fitness.values[0]: 6.4f} | '
+                    f'RMSD = {hof[i].fitness.values[1]: 6.4f} | '
+                    f'R2 = {hof[i].fitness.values[2]: 8.4f} | '
+                    f'Dmax = {hof[i].fitness.values[3]: 8.4f} | '
+                    f'Davg = {hof[i].fitness.values[4]: 8.4f}: '
+                    f'{hof[i].sympy_code}')
 
     logbook.header = 'gen', 'evals', 'RMSD', 'R2', 'Dmax', 'Davg', 'best'
     logbook.chapters['RMSD'].header = 'min', 'med', 'max'
     logbook.chapters['R2'].header = 'min', 'med', 'max'
     logbook.chapters['Dmax'].header = 'min', 'med', 'max'
     logbook.chapters['Davg'].header = 'min', 'med', 'max'
-    print('\n*** Statistics over generations ***')
-    print(logbook)
+    logger.info('\n*** Statistics over generations ***')
+    logger.info(logbook)
 
     time_format = '%d %B %Y: %H:%M:%S'
-    print('\n*** Time stats ***')
-    print(f'Started: {start_time.strftime(time_format)}')
-    print(f'Ended:   {end_time.strftime(time_format)}')
-    print(f'Elapsed: {end_time - start_time}')
+    logger.info('\n*** Time stats ***')
+    logger.info(f'Started: {start_time.strftime(time_format)}')
+    logger.info(f'Ended:   {end_time.strftime(time_format)}')
+    logger.info(f'Elapsed: {end_time - start_time}')

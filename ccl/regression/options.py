@@ -20,6 +20,7 @@ default_options = {
     'required_symbols': set(),
     'disabled_symbols': set(),
     'unique_symbols': set(),
+    'results': None,
     'max_constant_allowed': None,
     'allow_random_constants': False,
     'metric': 'RMSD'
