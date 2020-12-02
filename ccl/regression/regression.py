@@ -175,9 +175,9 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
         record = all_stats.compile(pop)
         logbook.record(gen=gen + 1, evals=len(invalid_ind), **record, best=hof[0].sympy_code)
 
+    executor.shutdown(wait=True)
     q.put(None)
     progress_process.join()
-    executor.shutdown(wait=True)
 
     end_time = datetime.datetime.now().replace(microsecond=0)
 
