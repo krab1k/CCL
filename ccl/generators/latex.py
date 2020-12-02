@@ -244,7 +244,10 @@ class Latex(ast.ASTVisitor):
 
     @staticmethod
     def visit_Number(node: ast.Number) -> str:
-        return str(node.val)
+        if node.val < 0:
+            return f'({str(node.val)})'
+        else:
+            return str(node.val)
 
     def visit_Subscript(self, node: ast.Subscript) -> str:
         name = self.visit(node.name)
@@ -254,7 +257,7 @@ class Latex(ast.ASTVisitor):
 
     def visit_BinaryOp(self, node: ast.BinaryOp) -> str:
         def need_braces(node: ast.Expression) -> bool:
-            if isinstance(node, ast.BinaryOp) and node.op in [ast.BinaryOp.Ops.POW, ast.BinaryOp.Ops.DIV]:
+            if isinstance(node, ast.BinaryOp) and node.op == ast.BinaryOp.Ops.POW:
                 return False
             elif isinstance(node, ast.Function):
                 return False
@@ -271,7 +274,7 @@ class Latex(ast.ASTVisitor):
             if need_braces(node.right):
                 right = f'\\left({right}\\right)'
 
-        op_str = node.op.value if node.op != ast.BinaryOp.Ops.MUL else ''
+        op_str = node.op.value if node.op != ast.BinaryOp.Ops.MUL else r'\cdot'
 
         if node.op == ast.BinaryOp.Ops.DIV:
             return f'\\frac{{{left}}}{{{right}}}'
