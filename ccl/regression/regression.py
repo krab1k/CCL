@@ -2,7 +2,7 @@
 
 import sys
 import random
-from deap import gp, creator, base, tools
+from deap import gp, creator, base, tools, algorithms
 import math
 import operator
 import concurrent.futures
@@ -100,7 +100,6 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     toolbox.register('mate', ccl.regression.deap_gp.cx_one_point, rng=rng)
     toolbox.register('expr_mut', ccl.regression.deap_gp.gen_full, min_=0, max_=3, rng=rng)
     toolbox.register('mutate', ccl.regression.deap_gp.mut_uniform, expr=toolbox.expr_mut, pset=pset, rng=rng)
-    toolbox.register('mutate_shrink', ccl.regression.deap_gp.mut_shrink, rng=rng)
 
     toolbox.decorate('mate', gp.staticLimit(operator.attrgetter('height'), 10),
                      gp.staticLimit(lambda x: int(not check_unique_symbols(x, options)), 0))
@@ -161,20 +160,8 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
                 break
 
         offspring = toolbox.select(pop, len(pop))
-        offspring = list(toolbox.map(toolbox.clone, offspring))
-        for child1, child2 in zip(offspring[::2], offspring[1::2]):
-            if rng.random() < options['crossover_probability']:
-                toolbox.mate(child1, child2)
-                del child1.fitness.values
-                del child2.fitness.values
-
-        for mutant in offspring:
-            if rng.random() < options['mutation_probability']:
-                if rng.random() < 0.3:
-                    toolbox.mutate_shrink(mutant)
-                else:
-                    toolbox.mutate(mutant)
-                del mutant.fitness.values
+        offspring = algorithms.varAnd(offspring, toolbox, options['crossover_probability'],
+                                      options['mutation_probability'])
 
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
         q.put(('gen', gen + 1, len(invalid_ind)))
