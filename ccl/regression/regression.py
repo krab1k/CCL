@@ -23,6 +23,7 @@ from ccl.regression.evaluate import evaluate, init, evaluate_population, generat
 from ccl.regression.init_gp import prepare_primitive_set
 from ccl.regression.options import default_options, print_options
 from ccl.regression.population import generate_population, add_seeded_individuals
+from ccl.regression.constraints import check_unique_symbols
 
 
 def progress_bar(q: multiprocessing.Queue, options: dict) -> None:
@@ -101,8 +102,10 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     toolbox.register('mutate', ccl.regression.deap_gp.mut_uniform, expr=toolbox.expr_mut, pset=pset, rng=rng)
     toolbox.register('mutate_shrink', ccl.regression.deap_gp.mut_shrink, rng=rng)
 
-    toolbox.decorate('mate', gp.staticLimit(operator.attrgetter('height'), 17))
-    toolbox.decorate('mutate', gp.staticLimit(operator.attrgetter('height'), 17))
+    toolbox.decorate('mate', gp.staticLimit(operator.attrgetter('height'), 10),
+                     gp.staticLimit(lambda x: int(not check_unique_symbols(x, options)), 0))
+    toolbox.decorate('mutate', gp.staticLimit(operator.attrgetter('height'), 10),
+                     gp.staticLimit(lambda x: int(not check_unique_symbols(x, options)), 0))
 
     rmsd_stats = tools.Statistics(key=lambda x: x.fitness.values[1])
     r2_stats = tools.Statistics(key=lambda x: x.fitness.values[2])

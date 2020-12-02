@@ -19,6 +19,7 @@ default_options = {
     'initial_seed_mutations': 10,
     'required_symbols': set(),
     'disabled_symbols': set(),
+    'unique_symbols': set(),
     'max_constant_allowed': None,
     'allow_random_constants': False,
     'metric': 'RMSD'

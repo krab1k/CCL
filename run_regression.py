@@ -40,9 +40,11 @@ def main():
     options.add_argument('--allow-random-constants', action='store_true', default=False,
                          help='Allow to generate random constants in range [0; 2]')
     options.add_argument('--required-symbols', type=str, nargs='+', default=[],
-                         help='List of symbols that must appear in each individual of the initial population')
+                         help='List of symbols that must appear in each individual')
     options.add_argument('--disabled-symbols', type=str, nargs='+', default=[],
-                         help='List of symbols that must not appear in each individual of the initial population')
+                         help='List of symbols that must not appear in each individual')
+    options.add_argument('--unique-symbols', type=str, nargs='+', default=[],
+                         help="List of symbols that can appear at most once in each individual")
 
     sys_dirs = parser.add_argument_group('System directories')
     sys_dirs.add_argument('--eigen-include', type=str, default='/usr/include/eigen3',
@@ -54,6 +56,7 @@ def main():
 
     parsed_options['required_symbols'] = set(parsed_options['required_symbols'])
     parsed_options['disabled_symbols'] = set(parsed_options['disabled_symbols'])
+    parsed_options['unique_symbols'] = set(parsed_options['unique_symbols'])
 
     method = CCLMethod.from_file(parsed_options['ccl_code'])
 

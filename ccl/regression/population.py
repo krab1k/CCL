@@ -6,7 +6,7 @@ import sympy
 import tqdm
 from deap import base, gp, creator
 
-from ccl.regression.constraints import check_required_symbols, check_max_constant
+from ccl.regression.constraints import check_required_symbols, check_max_constant, check_unique_symbols
 from ccl.regression.generators import generate_sympy_expr
 
 
@@ -19,6 +19,8 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
     while len(pop) < options['population_size']:
         ind = toolbox.individual()
         if options['required_symbols'] and not check_required_symbols(ind, options):
+            continue
+        if options['unique_symbols'] and not check_unique_symbols(ind, options):
             continue
         try:
             sympy_expr = generate_sympy_expr(ind, ccl_objects)
