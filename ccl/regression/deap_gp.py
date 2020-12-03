@@ -90,14 +90,6 @@ def cx_one_point(ind1: gp.PrimitiveTree, ind2: gp.PrimitiveTree, rng: random.Ran
     return ind1, ind2
 
 
-def mut_uniform(individual: gp.PrimitiveTree, expr: Callable, pset: gp.PrimitiveSetTyped, rng: random.Random):
-    index = rng.randrange(len(individual))
-    slice_ = individual.searchSubtree(index)
-    type_ = individual[index].ret
-    individual[slice_] = expr(pset=pset, type_=type_)
-    return individual,
-
-
 def sel_random(individuals: List[gp.PrimitiveTree], k: int, rng: random.Random) -> List[gp.PrimitiveTree]:
     return [rng.choice(individuals) for _ in range(k)]
 
@@ -133,7 +125,25 @@ def sel_double_tournament(individuals: List[gp.PrimitiveTree], k: int, fitness_s
     return _size_tournament()
 
 
+def mutate(individual: gp.PrimitiveTree, expr: Callable, pset: gp.PrimitiveSetTyped, rng: random.Random):
+    """Choose either shrinking the individual or uniform mutate"""
+    if rng.random() < 0.3:
+        return mut_shrink(individual, rng)
+    else:
+        return mut_uniform(individual, expr, pset, rng)
+
+
+def mut_uniform(individual: gp.PrimitiveTree, expr: Callable, pset: gp.PrimitiveSetTyped, rng: random.Random):
+    """Replace subtree with randomly generated tree"""
+    index = rng.randrange(len(individual))
+    slice_ = individual.searchSubtree(index)
+    type_ = individual[index].ret
+    individual[slice_] = expr(pset=pset, type_=type_)
+    return individual,
+
+
 def mut_shrink(individual: gp.PrimitiveTree, rng: random.Random) -> Tuple[gp.PrimitiveTree]:
+    """Replace node with one of its arguments"""
     # We don't want to "shrink" the root
     if len(individual) < 3 or individual.height <= 1:
         return individual,
