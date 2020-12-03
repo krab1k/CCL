@@ -65,6 +65,8 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
                 if s.type == ccl.types.ArrayType(ccl.types.ObjectType.ATOM, ):
                     atom_array_variables.append(s.name)
 
+    atom_names.sort()
+
     primitive_set = gp.PrimitiveSetTyped('MAIN', input_types, float)
 
     if options['allow_random_constants']:
