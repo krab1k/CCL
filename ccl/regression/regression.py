@@ -158,8 +158,7 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     for gen in range(options['generations']):
         if options['early_exit']:
-            if (options['metric'] == 'RMSD' and record['RMSD']['min'] < 1e-4) or \
-                    options['metric'] == 'R2' and record['R2']['max'] > 1 - 1e-4:
+            if (record['RMSD']['min'] < 1e-4) and record['R2']['max'] > 1 - 1e-4:
                 break
 
         offspring = toolbox.select(pop, len(pop))
