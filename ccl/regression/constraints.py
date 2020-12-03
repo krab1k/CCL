@@ -5,14 +5,21 @@ from collections import Counter
 from deap import gp
 
 
+def _get_primitive_name(primitive: gp.Primitive) -> str:
+    """Get the original name from a possibly mangled primitive"""
+    if primitive.name.startswith('_sym'):
+        return primitive.name.split('_')[-1]
+    elif primitive.name.startswith('_term'):
+        return primitive.name.split('_')[2]
+    else:
+        return primitive.name
+
+
 def check_required_symbols(individual: gp.PrimitiveTree, options: dict) -> bool:
     """Check whether an individual contains required symbols"""
     required = set(options['required_symbols'])
     for primitive in individual:
-        if primitive.name.startswith('_sym'):
-            name = primitive.name.split('_')[-1]
-        else:
-            name = primitive.name
+        name = _get_primitive_name(primitive)
         if name in required:
             required.remove(name)
             if not required:
@@ -25,11 +32,7 @@ def check_unique_symbols(individual: gp.PrimitiveTree, options: dict) -> bool:
     """Checks whether an individual contains each unique symbol at most once"""
     counts = Counter({s: 0 for s in options['unique_symbols']})
     for primitive in individual:
-        if primitive.name.startswith('_sym'):
-            name = primitive.name.split('_')[-1]
-        else:
-            name = primitive.name
-
+        name = _get_primitive_name(primitive)
         if name in counts:
             counts[name] += 1
     return all(count <= 1 for count in counts.values())

@@ -18,6 +18,9 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
     if distance_name is not None:
         variables[distance_name] = sympy.Function(distance_name, positive=True, real=True)
 
+    for fn in ccl_objects['single_argument']:
+        variables[fn] = sympy.Function(fn, real=True)
+
     for node in expr:
         stack.append((node, []))
         while len(stack[-1][1]) == stack[-1][0].arity:
@@ -40,9 +43,9 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
                 string = f'({args[0]}) ** 3'
             elif distance_name is not None and prim.name == distance_name:
                 string = f'{distance_name}({atom_names[0]}{atom_names[1]})'
-            elif prim.name in ccl_objects['single_argument']:
-                string = f'{prim.name}({args[0]})'
-                variables[prim.name] = sympy.Function(prim.name, real=True)
+            elif prim.name.startswith('_term'):
+                name, atom_name = prim.name.split('_')[-2:]
+                string = f'{name}({atom_name})'
             elif prim.name.startswith('_sym_add'):
                 name = prim.name.split('_')[-1]
                 string = f'({name}({atom_names[0]}) + {name}({atom_names[1]}))'
@@ -134,8 +137,9 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
                 string = args[0]
             elif distance_name is not None and prim.name == distance_name:
                 string = f'{distance_name}[{atom_names[0]}, {atom_names[1]}]'
-            elif prim.name in ccl_objects['single_argument']:
-                string = f'{prim.name}[{args[0]}]'
+            elif prim.name.startswith('_term'):
+                name, atom_name = prim.name.split('_')[-2:]
+                string = f'{name}[{atom_name}]'
             else:
                 string = prim.format(*args)
             if len(stack) == 0:

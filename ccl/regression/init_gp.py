@@ -11,10 +11,6 @@ import ccl.symboltable
 import ccl.types
 
 
-class AtomObject:
-    pass
-
-
 def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.RegressionExpr, rng: random.Random,
                           options: dict) -> Tuple[gp.PrimitiveSetTyped, dict]:
     """Prepare set of primitives from which the individual is built"""
@@ -26,7 +22,6 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
     if options['required_symbols'] & options['disabled_symbols']:
         raise RuntimeError('Cannot define symbol as required and disabled at the same time')
 
-    input_types = []
     atom_names = []
 
     atom_properties = []
@@ -43,7 +38,6 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
             if s.constraints is not None:
                 continue
             if s.type == ccl.types.ObjectType.ATOM:
-                input_types.append(AtomObject)
                 atom_names.append(s.name)
         elif isinstance(s, ccl.symboltable.FunctionSymbol):
             if s.function.name in ccl.functions.ELEMENT_PROPERTIES:
@@ -67,7 +61,7 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
 
     atom_names.sort()
 
-    primitive_set = gp.PrimitiveSetTyped('MAIN', input_types, float)
+    primitive_set = gp.PrimitiveSetTyped('MAIN', (), float)
 
     if options['allow_random_constants']:
         primitive_set.addEphemeralConstant('rand', lambda: round(rng.random() * 2, 1), float)
@@ -84,7 +78,6 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
     primitive_set.addPrimitive('square', [float], float, 'square')
     primitive_set.addPrimitive('cube', [float], float, 'cube')
     primitive_set.addPrimitive('exp', [float], float, 'exp')
-    primitive_set.addPrimitive('atom', [AtomObject], AtomObject, 'atom')
 
     if options['require_symmetry']:
         for x in filter_disabled_terms(atom_parameters + atom_array_variables + atom_properties):
@@ -93,7 +86,8 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
             primitive_set.addTerminal(f'_sym_mul_{x}', float, f'_sym_mul_{x}')
     else:
         for x in filter_disabled_terms(atom_parameters + atom_array_variables + atom_properties):
-            primitive_set.addPrimitive(x, [AtomObject], float, x)
+            for name in atom_names:
+                primitive_set.addTerminal(f'_term_{x}_{name}', float, f'_term_{x}_{name}')
 
     for x in filter_disabled_terms(common_parameters + simple_variables):
         primitive_set.addTerminal(x, float, x)
