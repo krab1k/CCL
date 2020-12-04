@@ -21,6 +21,7 @@ default_options = {
     'disabled_symbols': set(),
     'unique_symbols': set(),
     'results': None,
+    'max_tree_height': 17,
     'max_constant_allowed': None,
     'allow_random_constants': False,
     'metric': 'RMSD'

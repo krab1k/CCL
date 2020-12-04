@@ -102,8 +102,8 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     toolbox.register('expr_mut', ccl.regression.deap_gp.gen_full, min_=0, max_=3, rng=rng)
     toolbox.register('mutate', ccl.regression.deap_gp.mutate, expr=toolbox.expr_mut, pset=pset, rng=rng)
 
-    toolbox.decorate('mate', gp.staticLimit(operator.attrgetter('height'), 10))
-    toolbox.decorate('mutate', gp.staticLimit(operator.attrgetter('height'), 10))
+    toolbox.decorate('mate', gp.staticLimit(operator.attrgetter('height'), options['max_tree_height']))
+    toolbox.decorate('mutate', gp.staticLimit(operator.attrgetter('height'), options['max_tree_height']))
 
     if options['unique_symbols']:
         toolbox.decorate('mate', gp.staticLimit(lambda x: int(not check_unique_symbols(x, options)), 0))

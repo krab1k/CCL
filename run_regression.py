@@ -46,6 +46,7 @@ def main():
                          help='List of symbols that must not appear in each individual')
     options.add_argument('--unique-symbols', type=str, nargs='+', default=[],
                          help="List of symbols that can appear at most once in each individual")
+    options.add_argument('--max-tree-height', type=int, default=17, help='Maximum height of the expression tree')
 
     sys_dirs = parser.add_argument_group('System directories')
     sys_dirs.add_argument('--eigen-include', type=str, default='/usr/include/eigen3',
