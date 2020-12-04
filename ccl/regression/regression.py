@@ -158,8 +158,10 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     for gen in range(options['generations']):
         if options['early_exit']:
-            if (record['RMSD']['min'] < 1e-4) and record['R2']['max'] > 1 - 1e-4:
-                break
+            for individual in pop:
+                # Check if RMSD < 0.0001 and R2 > 0.9999
+                if individual.fitness.values[1] < 0.0001 and individual.fitness.values[2] > 0.9999:
+                    break
 
         offspring = toolbox.select(pop, len(pop))
         offspring = algorithms.varAnd(offspring, toolbox, options['crossover_probability'],
