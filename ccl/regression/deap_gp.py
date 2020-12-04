@@ -127,7 +127,7 @@ def sel_double_tournament(individuals: List[gp.PrimitiveTree], k: int, fitness_s
 
 def mutate(individual: gp.PrimitiveTree, expr: Callable, pset: gp.PrimitiveSetTyped, rng: random.Random):
     """Choose either shrinking the individual or uniform mutate"""
-    if rng.random() < 0.3:
+    if rng.random() < 0.5:
         return mut_shrink(individual, rng)
     else:
         return mut_uniform(individual, expr, pset, rng)
