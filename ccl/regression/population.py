@@ -73,10 +73,12 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
         while i < options['initial_seed_mutations']:
             y = toolbox.clone(x)
             try:
-                toolbox.mutate(y)
+                y, = toolbox.mutate(y)
             except IndexError:
                 raise RuntimeError(f'Incorrect seeded individual (probably wrong arity): {ind}')
             if options['required_symbols'] and not check_required_symbols(y, options):
+                continue
+            if options['unique_symbols'] and not check_unique_symbols(y, options):
                 continue
             try:
                 mut_sympy_expr = generate_sympy_expr(y, ccl_objects)
