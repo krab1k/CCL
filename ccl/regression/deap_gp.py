@@ -2,6 +2,10 @@ import sys
 import collections
 import operator
 import random
+import copy
+from functools import wraps
+
+
 from typing import List, Tuple, Callable
 
 from deap import gp
@@ -166,3 +170,18 @@ def mut_shrink(individual: gp.PrimitiveTree, rng: random.Random) -> Tuple[gp.Pri
         individual[slice_] = subtree
 
     return individual,
+
+
+def staticLimit(key: Callable, max_value: int) -> Callable:
+    """Enforce a limit on an operation on individual(s)"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            keep_inds = [copy.deepcopy(ind) for ind in args]
+            new_inds = list(func(*args, **kwargs))
+            for i, ind in enumerate(new_inds):
+                if key(ind) > max_value:
+                    new_inds[i] = copy.deepcopy(random.choice(keep_inds))
+            return new_inds
+        return wrapper
+    return decorator
