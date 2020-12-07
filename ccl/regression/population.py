@@ -6,7 +6,7 @@ import sympy
 import tqdm
 from deap import base, gp, creator
 
-from ccl.regression.constraints import check_required_symbols, check_max_constant, check_unique_symbols
+from ccl.regression.constraints import check_max_constant, check_symbol_counts
 from ccl.regression.generators import generate_sympy_expr
 
 
@@ -18,9 +18,7 @@ def generate_population(toolbox: base.Toolbox, ccl_objects: dict, options: dict)
     pbar = tqdm.tqdm(total=options['population_size'])
     while len(pop) < options['population_size']:
         ind = toolbox.individual()
-        if options['required_symbols'] and not check_required_symbols(ind, options):
-            continue
-        if options['unique_symbols'] and not check_unique_symbols(ind, options):
+        if not check_symbol_counts(ind, options):
             continue
         try:
             sympy_expr = generate_sympy_expr(ind, ccl_objects)
@@ -76,9 +74,7 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
                 y, = toolbox.mutate(y)
             except IndexError:
                 raise RuntimeError(f'Incorrect seeded individual (probably wrong arity): {ind}')
-            if options['required_symbols'] and not check_required_symbols(y, options):
-                continue
-            if options['unique_symbols'] and not check_unique_symbols(y, options):
+            if not check_symbol_counts(y, options):
                 continue
             try:
                 mut_sympy_expr = generate_sympy_expr(y, ccl_objects)

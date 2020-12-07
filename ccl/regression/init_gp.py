@@ -15,12 +15,11 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
                           options: dict) -> Tuple[gp.PrimitiveSetTyped, dict]:
     """Prepare set of primitives from which the individual is built"""
 
+    disabled_symbols = [symbol for symbol, (_, high) in options['symbol_counts'].items() if high == 0]
+
     def filter_disabled_terms(terms: Iterable[str]) -> List[str]:
         """Return only terms which are not disabled"""
-        return [x for x in terms if x not in options['disabled_symbols']]
-
-    if options['required_symbols'] & options['disabled_symbols']:
-        raise RuntimeError('Cannot define symbol as required and disabled at the same time')
+        return [x for x in terms if x not in disabled_symbols]
 
     atom_names = []
 
@@ -96,7 +95,7 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
         for math_fn in filter_disabled_terms(ccl.functions.MATH_FUNCTIONS):
             primitive_set.addPrimitive(math_fn, [float], float, math_fn)
 
-    if distance_name is not None and distance_name not in options['disabled_symbols']:
+    if distance_name is not None and distance_name not in disabled_symbols:
         if len(atom_names) != 2:
             raise RuntimeError(f'Distance symbol {distance_name} defined, but 2 atoms variables are required')
         primitive_set.addTerminal(distance_name, float, distance_name)

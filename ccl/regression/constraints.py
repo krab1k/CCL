@@ -15,27 +15,17 @@ def _get_primitive_name(primitive: gp.Primitive) -> str:
         return primitive.name
 
 
-def check_required_symbols(individual: gp.PrimitiveTree, options: dict) -> bool:
-    """Check whether an individual contains required symbols"""
-    required = set(options['required_symbols'])
-    for primitive in individual:
-        name = _get_primitive_name(primitive)
-        if name in required:
-            required.remove(name)
-            if not required:
-                break
+def check_symbol_counts(individual: gp.PrimitiveTree, options: dict) -> bool:
+    """Checks that an individual contains specified symbols in required counts"""
+    counts = Counter(_get_primitive_name(primitive) for primitive in individual)
 
-    return len(required) == 0
+    for symbol, (low, high) in options['symbol_counts'].items():
+        if low is not None and counts[symbol] < low:
+            return False
+        if high is not None and counts[symbol] > high:
+            return False
 
-
-def check_unique_symbols(individual: gp.PrimitiveTree, options: dict) -> bool:
-    """Checks whether an individual contains each unique symbol at most once"""
-    counts = Counter({s: 0 for s in options['unique_symbols']})
-    for primitive in individual:
-        name = _get_primitive_name(primitive)
-        if name in counts:
-            counts[name] += 1
-    return all(count <= 1 for count in counts.values())
+    return True
 
 
 def check_max_constant(sympy_expr: sympy.Expr, options: dict) -> bool:

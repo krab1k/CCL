@@ -40,14 +40,9 @@ def main():
                          help='Allow additional math functions like sin or cos')
     options.add_argument('--allow-random-constants', action='store_true', default=False,
                          help='Allow to generate random constants in range [0; 2]')
-    options.add_argument('--required-symbols', type=str, nargs='+', default=[],
-                         help='List of symbols that must appear in each individual')
-    options.add_argument('--disabled-symbols', type=str, nargs='+', default=[],
-                         help='List of symbols that must not appear in each individual')
-    options.add_argument('--unique-symbols', type=str, nargs='+', default=[],
-                         help="List of symbols that can appear at most once in each individual")
+    options.add_argument('--symbol-counts', type=str, nargs='+', default=[],
+                         help="Specify the occurrence limits of symbols in the expression")
     options.add_argument('--max-tree-height', type=int, default=17, help='Maximum height of the expression tree')
-
     sys_dirs = parser.add_argument_group('System directories')
     sys_dirs.add_argument('--eigen-include', type=str, default='/usr/include/eigen3',
                           help='Directory with Eigen3 include files')
@@ -56,9 +51,28 @@ def main():
 
     parsed_options = vars(parser.parse_args())
 
-    parsed_options['required_symbols'] = set(parsed_options['required_symbols'])
-    parsed_options['disabled_symbols'] = set(parsed_options['disabled_symbols'])
-    parsed_options['unique_symbols'] = set(parsed_options['unique_symbols'])
+    symbol_counts = list(parsed_options['symbol_counts'])
+    if len(symbol_counts) % 2:
+        raise RuntimeError('symbols-count argument error')
+
+    parsed_options['symbol_counts'] = {}
+    for s, c in zip(symbol_counts[::2], symbol_counts[1::2]):
+        parts = c.split(':')
+        try:
+            if len(parts) == 1:
+                low = high = int(parts[0])
+            elif len(parts) == 2:
+                low, high = parts
+                low = int(low) if low else None
+                high = int(high) if high else None
+                if low is not None and high is not None and low > high:
+                    raise RuntimeError('Options error: symbol-counts has lower bound higher than upper')
+            else:
+                raise RuntimeError('Options error: symbol-counts has bad count specifier')
+        except ValueError:
+            raise RuntimeError('Options error: symbol-counts is unable to convert a value to integer')
+
+        parsed_options['symbol_counts'][s] = (low, high)
 
     method = CCLMethod.from_file(parsed_options['ccl_code'])
 
