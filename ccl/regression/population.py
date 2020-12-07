@@ -97,3 +97,25 @@ def add_seeded_individuals(toolbox: base.Toolbox, options: dict, ccl_objects: di
             y.sympy_code = mut_sympy_code
             pop.append(y)
     return pop
+
+
+def load_wanted_expressions(options: dict, ccl_objects: dict, primitive_set: gp.PrimitiveSetTyped) -> List[str]:
+    """Load expressions that the GP algorithm should find"""
+    sympy_codes = []
+    raw_codes = []
+    with open(options['wanted_individuals']) as f:
+        for line in f:
+            raw_codes.append(line.strip())
+
+    for ind in raw_codes:
+        try:
+            x = creator.Individual(gp.PrimitiveTree.from_string(ind, primitive_set))
+        except TypeError:
+            raise RuntimeError(f'Incorrect desired individual (probably incorrect symbol): {ind}')
+        try:
+            sympy_code = str(generate_sympy_expr(x, ccl_objects))
+        except RuntimeError:
+            raise RuntimeError(f'Desired individual causes problem: {ind}')
+        sympy_codes.append(sympy_code)
+
+    return sympy_codes

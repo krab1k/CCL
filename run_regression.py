@@ -12,6 +12,7 @@ def main():
     files.add_argument('--ref-charges', type=str, required=True, help='Reference charges to compare to')
     files.add_argument('--parameters', type=str, required=True, help='Parameters required for the method')
     files.add_argument('--seeded-individuals', type=str, default=None, help='File with individuals to start with')
+    files.add_argument('--wanted-individuals', type=str, default=None, help='File with individuals to search for')
     files.add_argument('--save-best', type=str, default=None, help='File to store the best individuals')
     files.add_argument('--results', type=str, default=None, help='File to store results')
 

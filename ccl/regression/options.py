@@ -16,6 +16,7 @@ default_options = {
     'early_exit': False,
     'require_symmetry': False,
     'seeded_individuals': None,
+    'wanted_individuals': None,
     'initial_seed_mutations': 10,
     'symbol_counts': {'exp': (None, 1)},
     'results': None,

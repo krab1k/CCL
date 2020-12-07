@@ -23,7 +23,7 @@ import ccl.regression.deap_gp
 from ccl.regression.evaluate import evaluate, init, evaluate_population, generate_sympy_codes
 from ccl.regression.init_gp import prepare_primitive_set
 from ccl.regression.options import default_options, print_options
-from ccl.regression.population import generate_population, add_seeded_individuals
+from ccl.regression.population import generate_population, add_seeded_individuals, load_wanted_expressions
 from ccl.regression.constraints import check_symbol_counts
 
 
@@ -125,6 +125,9 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     print_options(options)
 
+    if options['wanted_individuals'] is not None:
+        wanted = {sympy_code: None for sympy_code in load_wanted_expressions(options, ccl_objects, pset)}
+
     # Run GP algorithm
 
     pop = []
@@ -138,6 +141,11 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
 
     print('*** Generating initial population ***')
     pop.extend(generate_population(toolbox, ccl_objects, options))
+
+    if options['wanted_individuals'] is not None:
+        for ind in pop:
+            if ind.sympy_code in wanted:
+                wanted[ind.sympy_code] = 0
 
     executor = concurrent.futures.ProcessPoolExecutor(options['ncpus'],
                                                       initializer=init,
@@ -180,6 +188,11 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
         hof.update(pop)
         record = all_stats.compile(pop)
         logbook.record(gen=gen + 1, evals=len(invalid_ind), **record, best=hof[0].sympy_code)
+
+        if options['wanted_individuals'] is not None:
+            for ind in pop:
+                if ind.sympy_code in wanted and wanted[ind.sympy_code] is None:
+                    wanted[ind.sympy_code] = gen
 
     executor.shutdown(wait=True)
     q.put(None)
@@ -229,6 +242,15 @@ def run_symbolic_regression(initial_method: 'CCLMethod', dataset: str, ref_charg
     logbook.chapters['Davg'].header = 'min', 'med', 'max'
     logger.info('\n*** Statistics over generations ***')
     logger.info(logbook)
+
+    if options['wanted_individuals'] is not None:
+        logger.info(f'\n*** Wanted individuals  ***')
+        max_length = max(len(x) for x in wanted)
+        for sympy_code, gen in wanted.items():
+            if gen is not None:
+                logger.info(f'{sympy_code:{max_length}}: {gen:2d}')
+            else:
+                logger.info(f'{sympy_code:{max_length}}: not found')
 
     time_format = '%d %B %Y: %H:%M:%S'
     logger.info('\n*** Time stats ***')
