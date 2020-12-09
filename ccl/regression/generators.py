@@ -33,8 +33,6 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
                 string = f'({args[0]}) * ({args[1]})'
             elif prim.name == 'div':
                 string = f'({args[0]}) / ({args[1]})'
-            elif prim.name in {'atom', 'bond'}:
-                string = f'{args[0]}'
             elif prim.name in {'sqrt', 'cbrt', 'exp'}:
                 string = f'{prim.name}({args[0]})'
             elif prim.name == 'square':
@@ -42,11 +40,11 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
             elif prim.name == 'cube':
                 string = f'({args[0]}) ** 3'
             elif prim.name == 'inv':
-                string = f'(1 / {args[0]})'
+                string = f'(1 / ({args[0]}))'
             elif prim.name == 'double':
-                string = f'(2 * {args[0]})'
+                string = f'(2 * ({args[0]}))'
             elif prim.name == 'half':
-                string = f'(0.5 * {args[0]})'
+                string = f'(0.5 * ({args[0]}))'
             elif distance_name is not None and prim.name == distance_name:
                 string = f'{distance_name}({atom_names[0]}{atom_names[1]})'
             elif prim.name.startswith('_term'):
@@ -91,24 +89,24 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
                     string = str(decimal.Decimal(args[0]) + decimal.Decimal(args[1]))
                 except decimal.InvalidOperation:
                     if args[0] < args[1]:
-                        string = f'{args[0]} + {args[1]}'
+                        string = f'({args[0]} + {args[1]})'
                     else:
-                        string = f'{args[1]} + {args[0]}'
+                        string = f'({args[1]} + {args[0]})'
             elif prim.name == 'sub':
                 if args[1] == '0.0':
-                    string = args[0]
+                    string = f'({args[0]})'
                 else:
                     try:
                         string = str(decimal.Decimal(args[0]) - decimal.Decimal(args[1]))
                     except decimal.InvalidOperation:
-                        string = f'{args[0]} - {args[1]}'
+                        string = f'({args[0]} - {args[1]})'
             elif prim.name == 'mul':
                 if args[0] == '0.0' or args[1] == '0.0':
                     string = '0.0'
                 elif args[0] == '1.0':
-                    string = args[1]
+                    string = f'({args[1]})'
                 elif args[1] == '1.0':
-                    string = args[0]
+                    string = f'({args[0]})'
                 elif args[0] < args[1]:
                     string = f'({args[0]}) * ({args[1]})'
                 else:
@@ -117,7 +115,7 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
                 if args[0] == args[1]:
                     string = '1.0'
                 elif args[1] == '1.0':
-                    string = args[0]
+                    string = f'({args[0]})'
                 else:
                     string = f'({args[0]}) / ({args[1]})'
             elif prim.name == 'sqrt':
@@ -131,11 +129,11 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
             elif prim.name == 'exp':
                 string = f'exp({args[0]})'
             elif prim.name == 'inv':
-                string = f'(1.0 / {args[0]})'
+                string = f'(1.0 / ({args[0]}))'
             elif prim.name == 'double':
-                string = f'(2.0 * {args[0]})'
+                string = f'(2.0 * ({args[0]}))'
             elif prim.name == 'half':
-                string = f'(0.5 * {args[0]})'
+                string = f'(0.5 * ({args[0]}))'
             elif prim.name.startswith('_sym_add'):
                 name = prim.name.split('_')[-1]
                 string = f'({name}[{atom_names[0]}] + {name}[{atom_names[1]}])'
@@ -145,8 +143,6 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
             elif prim.name.startswith('_sym_mul'):
                 name = prim.name.split('_')[-1]
                 string = f'({name}[{atom_names[0]}] * {name}[{atom_names[1]}])'
-            elif prim.name in {'atom', 'bond'}:
-                string = args[0]
             elif distance_name is not None and prim.name == distance_name:
                 string = f'{distance_name}[{atom_names[0]}, {atom_names[1]}]'
             elif prim.name.startswith('_term'):
