@@ -41,6 +41,12 @@ def generate_sympy_expr(expr: gp.PrimitiveTree, ccl_objects: dict) -> sympy.Expr
                 string = f'({args[0]}) ** 2'
             elif prim.name == 'cube':
                 string = f'({args[0]}) ** 3'
+            elif prim.name == 'inv':
+                string = f'(1 / {args[0]})'
+            elif prim.name == 'double':
+                string = f'(2 * {args[0]})'
+            elif prim.name == 'half':
+                string = f'(0.5 * {args[0]})'
             elif distance_name is not None and prim.name == distance_name:
                 string = f'{distance_name}({atom_names[0]}{atom_names[1]})'
             elif prim.name.startswith('_term'):
@@ -124,6 +130,12 @@ def generate_optimized_ccl_code(expr: gp.PrimitiveTree, ccl_objects: dict) -> st
                 string = f'({args[0]}) ^ 3.0'
             elif prim.name == 'exp':
                 string = f'exp({args[0]})'
+            elif prim.name == 'inv':
+                string = f'(1.0 / {args[0]})'
+            elif prim.name == 'double':
+                string = f'(2.0 * {args[0]})'
+            elif prim.name == 'half':
+                string = f'(0.5 * {args[0]})'
             elif prim.name.startswith('_sym_add'):
                 name = prim.name.split('_')[-1]
                 string = f'({name}[{atom_names[0]}] + {name}[{atom_names[1]}])'

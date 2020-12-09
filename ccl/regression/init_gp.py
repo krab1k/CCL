@@ -62,12 +62,16 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
 
     primitive_set = gp.PrimitiveSetTyped('MAIN', (), float)
 
-    if options['allow_random_constants']:
-        primitive_set.addEphemeralConstant('rand', lambda: round(rng.random() * 2, 1), float)
+    if options['only_multiplicative_constants']:
+        primitive_set.addPrimitive('double', [float], float, 'double')
+        primitive_set.addPrimitive('half', [float], float, 'half')
+    else:
+        primitive_set.addTerminal('0.5', float, '0.5')
+        primitive_set.addTerminal('1.0', float, '1.0')
+        primitive_set.addTerminal('2.0', float, '2.0')
+        if options['allow_random_constants']:
+            primitive_set.addEphemeralConstant('rand', lambda: round(rng.random() * 2, 1), float)
 
-    primitive_set.addTerminal('0.5', float, '0.5')
-    primitive_set.addTerminal('1.0', float, '1.0')
-    primitive_set.addTerminal('2.0', float, '2.0')
     primitive_set.addPrimitive('add', [float, float], float, 'add')
     primitive_set.addPrimitive('sub', [float, float], float, 'sub')
     primitive_set.addPrimitive('mul', [float, float], float, 'mul')
@@ -77,6 +81,7 @@ def prepare_primitive_set(table: ccl.symboltable.SymbolTable, expr: ccl.ast.Regr
     primitive_set.addPrimitive('square', [float], float, 'square')
     primitive_set.addPrimitive('cube', [float], float, 'cube')
     primitive_set.addPrimitive('exp', [float], float, 'exp')
+    primitive_set.addPrimitive('inv', [float], float, 'inv')
 
     if options['require_symmetry']:
         for x in filter_disabled_terms(atom_parameters + atom_array_variables + atom_properties):

@@ -41,6 +41,8 @@ def main():
                          help='Allow additional math functions like sin or cos')
     options.add_argument('--allow-random-constants', action='store_true', default=False,
                          help='Allow to generate random constants in range [0; 2]')
+    options.add_argument('--only-multiplicative-constants', action='store_true', default=False,
+                         help='Allow to use only two constants in a form of 2 * x or 0.5 * x')
     options.add_argument('--symbol-counts', type=str, nargs='+', default=[],
                          help="Specify the occurrence limits of symbols in the expression")
     options.add_argument('--max-tree-height', type=int, default=17, help='Maximum height of the expression tree')

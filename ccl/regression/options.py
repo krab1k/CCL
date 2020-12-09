@@ -23,7 +23,8 @@ default_options = {
     'max_tree_height': 17,
     'max_constant_allowed': None,
     'allow_random_constants': False,
-    'metric': 'RMSD'
+    'metric': 'RMSD',
+    'only_multiplicative_constants': False
 }
 
 
